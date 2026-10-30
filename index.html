@@ -90,7 +90,7 @@
           </button>
 
           <span id="save-indicator" class="hidden text-[10px] bg-emerald-950/80 text-emerald-400 border border-emerald-800/80 px-2 sm:px-2.5 py-1.5 rounded-lg flex items-center gap-1 font-mono">
-            <i class="fa-solid fa-cloud"></i> <span class="hidden md:inline">Synced</span>
+            <i class="fa-solid fa-cloud"></i> <span class="hidden md:inline">Live Sync</span>
           </span>
 
           <button id="btn-undo" onclick="undoLastPick()" class="hidden text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-2.5 sm:px-3 py-1.5 rounded-lg border border-slate-700 flex items-center gap-1 transition">
@@ -110,7 +110,7 @@
           <span class="text-slate-400 text-[11px] sm:text-xs">Your Seat:</span>
           <span id="current-identity-name" class="font-bold text-indigo-300 bg-indigo-950/80 border border-indigo-800/80 px-2 py-0.5 rounded text-[11px] sm:text-xs truncate">Unclaimed / Spectator</span>
         </div>
-        <button onclick="openIdentityModal()" class="text-[11px] text-indigo-400 hover:underline flex items-center gap-1 shrink-0 font-semibold">
+        <button onclick="openIdentityModal(true)" class="text-[11px] text-indigo-400 hover:underline flex items-center gap-1 shrink-0 font-semibold">
           <i class="fa-solid fa-user-gear"></i> Change Seat
         </button>
       </div>
@@ -370,6 +370,8 @@
     let auth = null;
     let pendingPickCard = null;
     let activeFilters = { text: '', colors: [] };
+    let timerInterval = null;
+    let secondsLeft = 0;
 
     let appState = {
       players: [],
@@ -391,6 +393,13 @@
       } else {
         roomId = `ROOM_${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
       }
+      
+      // Load stored seat for this room if exists
+      const savedSeat = sessionStorage.getItem(`mtg_seat_${roomId}`);
+      if (savedSeat !== null) {
+        mySeatId = parseInt(savedSeat, 10);
+      }
+
       initFirebase();
     }
 
@@ -431,6 +440,11 @@
               window.location.hash = `#room=${roomId}`;
             }
             transitionToDraftScreen();
+            
+            // Auto prompt seat modal if user hasn't selected seat yet
+            if (mySeatId === null) {
+              openIdentityModal(false);
+            }
           }
         }
       }, (err) => {
@@ -438,7 +452,7 @@
       });
     }
 
-    // Quote-aware CSV line parsing
+    // RFC-4180 Quote-aware CSV parser
     function parseCSVRow(text) {
       const result = [];
       let cell = '';
@@ -479,6 +493,7 @@
         const cells = parseCSVRow(lines[i]);
         if (cells.length > nameColIndex) {
           let rawName = cells[nameColIndex].replace(/^"|"$/g, '').trim();
+          // Remove leading quantity markers (e.g. '1x ', '1 ')
           rawName = rawName.replace(/^1x?\s+/, '');
           if (rawName.length > 0) {
             cardNames.push(rawName);
@@ -619,15 +634,18 @@
 
       const order = [];
       const mode = document.querySelector('input[name="draftMode"]:checked').value;
-      const rounds = Math.ceil((cardPool.length) / players.length) + 5;
+      const picksPerTurn = parseInt(document.getElementById('select-picks-per-turn').value);
+      const rounds = Math.ceil((cardPool.length) / (players.length * picksPerTurn)) + 5;
       
       for (let round = 0; round < rounds; round++) {
-        if (mode === 'snake') {
-          const roundOrder = players.map(p => p.id);
-          order.push(...(round % 2 === 0 ? roundOrder : roundOrder.reverse()));
-        } else {
-          order.push(...players.map(p => p.id));
-        }
+        const roundOrder = players.map(p => p.id);
+        const sequence = (mode === 'snake' && round % 2 !== 0) ? roundOrder.reverse() : roundOrder;
+        
+        sequence.forEach(pid => {
+          for (let k = 0; k < picksPerTurn; k++) {
+            order.push(pid);
+          }
+        });
       }
 
       appState = {
@@ -637,7 +655,7 @@
         draftOrder: order,
         draftMode: mode,
         maxPicks: parseInt(document.getElementById('select-max-picks').value),
-        picksPerTurn: parseInt(document.getElementById('select-picks-per-turn').value),
+        picksPerTurn: picksPerTurn,
         turnTimer: parseInt(document.getElementById('select-turn-timer').value),
         selectedRosterPlayerIndex: 0
       };
@@ -675,6 +693,10 @@
       const unpicked = appState.cardPool.filter(c => c.draftedBy === null);
       document.getElementById('stat-cards-remaining').innerText = unpicked.length;
       document.getElementById('filtered-count').innerText = `${unpicked.length} Available`;
+
+      // Render seat identity badge
+      const mySeatPlayer = appState.players.find(p => p.id === mySeatId);
+      document.getElementById('current-identity-name').innerText = mySeatPlayer ? mySeatPlayer.name : 'Unclaimed / Spectator';
 
       const gridContainer = document.getElementById('card-grid-container');
       gridContainer.innerHTML = '';
@@ -766,10 +788,19 @@
     };
 
     window.openPickModal = function(card) {
+      const activePlayerId = appState.draftOrder[appState.currentPickIndex];
+      const activePlayer = appState.players.find(p => p.id === activePlayerId);
+
+      // Lock out if claimed seat doesn't match active turn (allows spectator override if no seat claimed)
+      if (mySeatId !== null && mySeatId !== activePlayerId) {
+        alert(`It is currently ${activePlayer?.name || 'another player'}'s turn to draft!`);
+        return;
+      }
+
       pendingPickCard = card;
       document.getElementById('pick-modal-title').innerText = `Draft ${card.name}?`;
       document.getElementById('pick-modal-card-preview').innerHTML = `<img src="${card.image}" alt="${card.name}" class="w-full h-auto">`;
-      document.getElementById('pick-modal-desc').innerText = `Pick card for ${appState.players.find(p => p.id === appState.draftOrder[appState.currentPickIndex])?.name || 'Active Player'}`;
+      document.getElementById('pick-modal-desc').innerText = `Pick card for ${activePlayer?.name || 'Active Player'}`;
       document.getElementById('pick-modal').classList.remove('hidden');
     };
 
@@ -838,16 +869,23 @@
       }
     };
 
-    window.openIdentityModal = function() {
+    window.openIdentityModal = function(allowCancel = true) {
       const list = document.getElementById('identity-seats-list');
       list.innerHTML = '';
       appState.players.forEach(p => {
         list.innerHTML += `
-          <button onclick="claimSeat(${p.id})" class="w-full text-left p-2.5 rounded-xl bg-slate-950 hover:bg-indigo-950 border border-slate-800 text-xs font-bold text-slate-200">
-            ${p.name}
+          <button onclick="claimSeat(${p.id})" class="w-full text-left p-2.5 rounded-xl bg-slate-950 hover:bg-indigo-950 border border-slate-800 text-xs font-bold text-slate-200 flex justify-between items-center">
+            <span>${p.name}</span>
+            <span class="text-[10px] text-indigo-400 font-mono">${p.pool.length} Cards</span>
           </button>
         `;
       });
+      
+      const cancelBtn = document.querySelector('#identity-modal button[onclick="closeIdentityModal()"]');
+      if (cancelBtn) {
+        cancelBtn.style.display = allowCancel ? 'block' : 'none';
+      }
+
       document.getElementById('identity-modal').classList.remove('hidden');
     };
 
@@ -857,9 +895,13 @@
 
     window.claimSeat = function(seatId) {
       mySeatId = seatId;
+      if (roomId) {
+        sessionStorage.setItem(`mtg_seat_${roomId}`, seatId.toString());
+      }
       const p = appState.players.find(pl => pl.id === seatId);
       document.getElementById('current-identity-name').innerText = p ? p.name : 'Spectator';
       closeIdentityModal();
+      renderBoard();
     };
 
     window.updatePlayerInputs(4);
