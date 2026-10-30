@@ -13,9 +13,6 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
-  <!-- DISCORD EMBEDDED APP SDK -->
-  <script src="https://cdn.jsdelivr.net/npm/@discord/embedded-app-sdk@1/dist/index.min.js"></script>
-
   <script>
     tailwind.config = {
       theme: {
@@ -25,16 +22,6 @@
             cinzel: ['Cinzel', 'serif']
           },
           colors: {
-            discord: {
-              blurple: '#5865F2',
-              green: '#57F287',
-              yellow: '#FEE75C',
-              fuchsia: '#EB459E',
-              red: '#ED4245',
-              dark: '#313338',
-              darker: '#2B2D31',
-              darkest: '#1E1F22'
-            },
             mtg: {
               white: '#F8F6D8',
               blue: '#0E68AB',
@@ -70,25 +57,17 @@
   <div id="app" class="min-h-screen flex flex-col justify-between">
 
     <!-- HEADER / NAVIGATION BAR -->
-    <header class="bg-discord-darker border-b border-slate-800 sticky top-0 z-30 shadow-xl">
+    <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-30 shadow-xl">
       <div class="max-w-7xl mx-auto px-3 sm:px-4 h-14 sm:h-16 flex items-center justify-between gap-2">
         <!-- Logo / Title -->
         <div class="flex items-center space-x-2 sm:space-x-3 cursor-pointer shrink-0" onclick="confirmReset()">
-          <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-discord-blurple p-[2px] shadow-lg flex items-center justify-center">
-            <i class="fa-brands fa-discord text-white text-base"></i>
+          <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-amber-500 p-[2px] shadow-lg flex items-center justify-center">
+            <i class="fa-solid fa-layer-group text-white text-base"></i>
           </div>
           <div>
-            <h1 class="font-cinzel font-bold text-xs sm:text-base tracking-wider text-white leading-none">DISCORD ROTISSERIE</h1>
-            <p class="text-[9px] sm:text-[10px] text-discord-blurple font-medium tracking-widest uppercase mt-0.5">MTG Activity</p>
+            <h1 class="font-cinzel font-bold text-xs sm:text-base tracking-wider text-white leading-none">ROTISSERIE DRAFT</h1>
+            <p class="text-[9px] sm:text-[10px] text-indigo-400 font-medium tracking-widest uppercase mt-0.5">Magic: The Gathering</p>
           </div>
-        </div>
-
-        <!-- Discord User Badge -->
-        <div id="discord-user-badge" class="hidden sm:flex items-center space-x-2 bg-discord-darkest px-3 py-1 rounded-xl border border-slate-800 text-xs">
-          <img id="discord-avatar" class="w-5 h-5 rounded-full bg-slate-700" src="https://placehold.co/40x40/5865F2/ffffff?text=D" alt="User">
-          <span id="discord-username" class="font-bold text-slate-200">Discord User</span>
-          <span class="text-xs text-slate-500">|</span>
-          <span id="discord-channel-name" class="text-discord-blurple text-[11px]"><i class="fa-solid fa-hashtag mr-1"></i>Voice Activity</span>
         </div>
 
         <!-- Dynamic Header Stats -->
@@ -107,40 +86,32 @@
         <!-- Action Controls -->
         <div class="flex items-center space-x-1 sm:space-x-2 shrink-0">
           <button id="btn-share-room" onclick="copyRoomLink()" class="hidden text-xs bg-indigo-950 hover:bg-indigo-900 text-indigo-300 border border-indigo-700/80 px-2.5 sm:px-3 py-1.5 rounded-lg flex items-center gap-1 font-mono shadow-sm">
-            <i class="fa-solid fa-share-nodes text-indigo-400"></i> <span class="hidden sm:inline">Share</span>
+            <i class="fa-solid fa-share-nodes text-indigo-400"></i> <span class="hidden sm:inline">Share Link</span>
           </button>
 
           <span id="save-indicator" class="hidden text-[10px] bg-emerald-950/80 text-emerald-400 border border-emerald-800/80 px-2 sm:px-2.5 py-1.5 rounded-lg flex items-center gap-1 font-mono">
-            <i class="fa-solid fa-floppy-disk"></i> <span class="hidden md:inline">Sync</span>
+            <i class="fa-solid fa-cloud"></i> <span class="hidden md:inline">Synced</span>
           </span>
 
           <button id="btn-undo" onclick="undoLastPick()" class="hidden text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-2.5 sm:px-3 py-1.5 rounded-lg border border-slate-700 flex items-center gap-1 transition">
             <i class="fa-solid fa-rotate-left text-amber-400"></i> <span class="hidden sm:inline">Undo</span>
           </button>
           <button id="btn-restart" onclick="confirmReset()" class="text-xs bg-slate-800 hover:bg-red-950/60 hover:text-red-300 text-slate-300 px-2.5 sm:px-3 py-1.5 rounded-lg border border-slate-700 transition flex items-center gap-1">
-            <i class="fa-solid fa-power-off"></i> <span class="hidden sm:inline">New</span>
+            <i class="fa-solid fa-power-off"></i> <span class="hidden sm:inline">New Draft</span>
           </button>
         </div>
       </div>
     </header>
 
-    <!-- ALERT BANNER FOR ERRORS -->
-    <div id="error-alert" class="hidden max-w-7xl mx-auto my-2 px-3 sm:px-4 w-full">
-      <div class="bg-red-950/90 border border-red-700/80 text-red-200 text-xs p-3 rounded-xl flex justify-between items-center shadow-lg">
-        <span id="error-alert-msg"><i class="fa-solid fa-triangle-exclamation text-red-400 mr-2"></i> An error occurred.</span>
-        <button onclick="dismissAlert()" class="text-red-400 hover:text-white ml-2"><i class="fa-solid fa-xmark"></i></button>
-      </div>
-    </div>
-
     <!-- PLAYER CLAIM IDENTITY BANNER -->
     <div id="identity-bar" class="hidden bg-slate-900/90 border-b border-slate-800 py-1.5 px-3 sm:px-4 text-xs">
       <div class="max-w-7xl mx-auto flex justify-between items-center gap-2">
         <div class="flex items-center gap-1.5 sm:gap-2 truncate">
-          <span class="text-slate-400 text-[11px] sm:text-xs">Identity:</span>
+          <span class="text-slate-400 text-[11px] sm:text-xs">Your Seat:</span>
           <span id="current-identity-name" class="font-bold text-indigo-300 bg-indigo-950/80 border border-indigo-800/80 px-2 py-0.5 rounded text-[11px] sm:text-xs truncate">Unclaimed / Spectator</span>
         </div>
         <button onclick="openIdentityModal()" class="text-[11px] text-indigo-400 hover:underline flex items-center gap-1 shrink-0 font-semibold">
-          <i class="fa-solid fa-user-gear"></i> Change
+          <i class="fa-solid fa-user-gear"></i> Change Seat
         </button>
       </div>
     </div>
@@ -151,8 +122,8 @@
       <!-- SCREEN 1: SETUP CONTAINER -->
       <div id="screen-setup" class="max-w-3xl w-full mx-auto space-y-4 sm:space-y-6">
         <div class="text-center space-y-1.5 sm:space-y-2">
-          <h2 class="text-2xl sm:text-3xl font-cinzel font-bold text-white">Create Rotisserie Draft</h2>
-          <p class="text-[11px] sm:text-xs text-slate-400 max-w-lg mx-auto">Set up player seats, draft rules, paste a cube list or upload CSV/CubeCobra data, and launch a real-time synchronized draft room.</p>
+          <h2 class="text-2xl sm:text-3xl font-cinzel font-bold text-white">Rotisserie Draft Setup</h2>
+          <p class="text-[11px] sm:text-xs text-slate-400 max-w-lg mx-auto">Set up player seats, draft rules, paste a card list or upload a CSV file with full comma support, and launch a synced draft session.</p>
         </div>
 
         <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-2xl space-y-5 sm:space-y-6">
@@ -177,7 +148,7 @@
 
           <!-- Draft Mode & Rule Settings -->
           <div>
-            <label class="text-xs font-bold uppercase tracking-wider text-indigo-400 block mb-3">2. Draft Rules & Timer Controls</label>
+            <label class="text-xs font-bold uppercase tracking-wider text-indigo-400 block mb-3">2. Draft Rules & Options</label>
             <div class="space-y-3 sm:space-y-4">
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
                 <label class="flex items-center space-x-3 p-3 bg-slate-950/60 rounded-xl border border-slate-800 cursor-pointer hover:border-slate-700">
@@ -200,7 +171,7 @@
                 <div>
                   <label class="text-[11px] font-medium text-slate-400 block mb-1">Max Picks Per Player</label>
                   <select id="select-max-picks" class="w-full bg-slate-950 border border-slate-700 rounded-lg text-xs p-2 text-slate-200 focus:outline-none focus:border-indigo-500">
-                    <option value="0" selected>Unlimited (Until Empty)</option>
+                    <option value="0" selected>Unlimited (Until Pool Exhausted)</option>
                     <option value="15">15 Cards</option>
                     <option value="23">23 Cards</option>
                     <option value="30">30 Cards</option>
@@ -239,15 +210,26 @@
               <div class="flex flex-wrap items-center gap-1.5 sm:gap-2">
                 <button type="button" onclick="loadPreset('classic')" class="text-[10px] sm:text-[11px] bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-1 rounded-lg border border-slate-700">Power Cube</button>
                 <button type="button" onclick="loadPreset('vintage')" class="text-[10px] sm:text-[11px] bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-1 rounded-lg border border-slate-700">Vintage Cube</button>
-                <label class="text-[10px] sm:text-[11px] bg-indigo-950 hover:bg-indigo-900 text-indigo-300 px-2 py-1 rounded-lg border border-indigo-700/80 cursor-pointer">
-                  <i class="fa-solid fa-file-csv mr-1"></i> Upload File
+                <label class="text-[10px] sm:text-[11px] bg-indigo-950 hover:bg-indigo-900 text-indigo-300 px-2.5 py-1 rounded-lg border border-indigo-700/80 cursor-pointer flex items-center gap-1">
+                  <i class="fa-solid fa-file-csv"></i> Upload CSV / Text
                   <input type="file" id="file-input" accept=".csv, .txt" onchange="handleFileUpload(event)" class="hidden">
                 </label>
               </div>
             </div>
 
-            <textarea id="input-card-pool" rows="6" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs font-mono text-slate-200 focus:outline-none focus:border-indigo-500 placeholder-slate-600 resize-y" placeholder="Paste card names line by line or CSV output..."></textarea>
-            <p class="text-[10px] sm:text-[11px] text-slate-500">Supports raw card names, quantities (e.g. 1 Black Lotus), or official CubeCobra CSV exports.</p>
+            <textarea id="input-card-pool" rows="6" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs font-mono text-slate-200 focus:outline-none focus:border-indigo-500 placeholder-slate-600 resize-y" placeholder="Paste card names line by line or upload a CSV file..."></textarea>
+            <p class="text-[10px] sm:text-[11px] text-slate-500">Full support for CubeCobra exports and names with commas (e.g. "Minsc & Boo, Timeless Heroes", "Hazoret, the Fervent").</p>
+          </div>
+
+          <!-- Loading Progress Bar -->
+          <div id="fetch-progress-container" class="hidden space-y-1.5">
+            <div class="flex justify-between text-xs text-indigo-400 font-mono">
+              <span id="fetch-progress-status">Querying Scryfall API...</span>
+              <span id="fetch-progress-count">0 / 0</span>
+            </div>
+            <div class="w-full bg-slate-950 rounded-full h-2 overflow-hidden border border-slate-800">
+              <div id="fetch-progress-bar" class="bg-indigo-500 h-full w-0 transition-all duration-200"></div>
+            </div>
           </div>
 
           <!-- Launch Draft Button -->
@@ -270,9 +252,6 @@
                 <span class="text-[9px] sm:text-[10px] uppercase tracking-widest text-slate-400 block font-semibold">Current Turn Pick</span>
                 <div class="flex items-center gap-2">
                   <h3 id="active-player-name" class="text-base sm:text-xl font-cinzel font-bold text-amber-300 truncate max-w-[160px] sm:max-w-none">Player 1</h3>
-                  <span id="turn-timer-display" class="hidden text-xs font-mono font-bold bg-red-950/80 border border-red-700 text-red-300 px-2 py-0.5 rounded-lg animate-pulse">
-                    <i class="fa-solid fa-stopwatch mr-1"></i><span id="timer-sec">00</span>s
-                  </span>
                 </div>
               </div>
             </div>
@@ -289,7 +268,7 @@
         <div class="bg-slate-900 border border-slate-800 rounded-xl sm:rounded-2xl p-2.5 sm:p-3 flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center justify-between">
           <div class="relative flex-1">
             <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-500 text-xs"></i>
-            <input type="text" id="filter-search" oninput="onSearchChange(this.value)" placeholder="Search card name or text..." class="w-full bg-slate-950 border border-slate-700 rounded-xl pl-8 pr-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
+            <input type="text" id="filter-search" oninput="onSearchChange(this.value)" placeholder="Search card name..." class="w-full bg-slate-950 border border-slate-700 rounded-xl pl-8 pr-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
           </div>
 
           <div class="flex items-center justify-between sm:justify-end gap-2 overflow-x-auto">
@@ -302,11 +281,6 @@
               <button onclick="toggleColorFilter('C')" id="filter-c" class="w-7 h-7 rounded-lg font-bold text-xs bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700">C</button>
               <button onclick="resetFilters()" class="text-[11px] text-slate-400 hover:text-white px-1.5 py-1 font-semibold">Reset</button>
             </div>
-
-            <div class="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 shrink-0">
-              <button onclick="setViewMode('grid')" id="view-grid-btn" class="p-1.5 px-2.5 rounded-lg text-xs bg-indigo-600 text-white font-semibold"><i class="fa-solid fa-border-all"></i></button>
-              <button onclick="setViewMode('list')" id="view-list-btn" class="p-1.5 px-2.5 rounded-lg text-xs text-slate-400 hover:text-white"><i class="fa-solid fa-list"></i></button>
-            </div>
           </div>
         </div>
 
@@ -314,7 +288,7 @@
         <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 flex-1">
           <div class="lg:col-span-3 flex flex-col bg-slate-900 border border-slate-800 rounded-xl sm:rounded-2xl p-3 sm:p-4 min-h-[350px]">
             <div class="flex justify-between items-center mb-2.5">
-              <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Available Cards</span>
+              <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Available Card Pool</span>
               <span id="filtered-count" class="text-xs font-mono text-slate-500">0 Cards</span>
             </div>
 
@@ -336,16 +310,9 @@
                 <span class="text-slate-400">Drafted Total:</span>
                 <span id="player-pool-count" class="font-bold text-indigo-400 font-mono">0 Cards</span>
               </div>
-              <div class="flex justify-between items-center text-xs">
-                <span class="text-slate-400">Grouping:</span>
-                <select id="pool-grouping-select" onchange="setPoolGrouping(this.value)" class="bg-slate-900 text-slate-300 border border-slate-700 rounded px-1.5 py-0.5 text-[11px]">
-                  <option value="type">By Type</option>
-                  <option value="cmc">By Mana Value</option>
-                </select>
-              </div>
             </div>
 
-            <div id="player-pool-cards" class="flex-1 overflow-y-auto max-h-[40vh] space-y-3 font-mono text-xs"></div>
+            <div id="player-pool-cards" class="flex-1 overflow-y-auto max-h-[40vh] space-y-2 font-mono text-xs"></div>
 
             <button onclick="exportPlayerDeck()" class="w-full py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition">
               <i class="fa-solid fa-download"></i> Export Decklist
@@ -398,14 +365,11 @@
     import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
     import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
-    let discordSdk = null;
-    let discordUser = null;
     let roomId = null;
     let db = null;
     let auth = null;
     let pendingPickCard = null;
     let activeFilters = { text: '', colors: [] };
-    let viewMode = 'grid';
 
     let appState = {
       players: [],
@@ -416,56 +380,23 @@
       maxPicks: 0,
       picksPerTurn: 1,
       turnTimer: 0,
-      selectedRosterPlayerIndex: 0,
-      poolGrouping: 'type'
+      selectedRosterPlayerIndex: 0
     };
-    let myPlayerId = null;
+    let mySeatId = null;
 
-    async function initDiscord() {
-      try {
-        if (window.DiscordSDK) {
-          const clientId = '123456789012345678';
-          discordSdk = new window.DiscordSDK(clientId);
-          await discordSdk.ready();
-
-          const queryParams = new URLSearchParams(window.location.search);
-          const channelId = queryParams.get('channel_id') || discordSdk.channelId;
-
-          if (channelId) {
-            roomId = `DISCORD_${channelId}`;
-          }
-
-          const { code } = await discordSdk.commands.authorize({
-            client_id: clientId,
-            response_type: 'code',
-            prompt: 'none',
-            scope: ['identify', 'guilds']
-          });
-
-          discordUser = await discordSdk.commands.authenticate({ code });
-          if (discordUser && discordUser.user) {
-            document.getElementById('discord-username').innerText = discordUser.user.username;
-            if (discordUser.user.avatar) {
-              document.getElementById('discord-avatar').src = `https://cdn.discordapp.com/avatars/${discordUser.user.id}/${discordUser.user.avatar}.png`;
-            }
-            document.getElementById('discord-user-badge').classList.remove('hidden');
-          }
-        }
-      } catch (e) {
-        console.log("Discord SDK preview mode:", e);
+    function initRoomHash() {
+      const hashMatch = window.location.hash.match(/room=([^&]+)/);
+      if (hashMatch) {
+        roomId = hashMatch[1];
+      } else {
+        roomId = `ROOM_${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
       }
-
-      if (!roomId) {
-        const hashMatch = window.location.hash.match(/room=([^&]+)/);
-        roomId = hashMatch ? hashMatch[1] : `ROOM_${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-      }
-
       initFirebase();
     }
 
     async function initFirebase() {
       try {
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'mtg-rotisserie-discord';
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'mtg-rotisserie-app';
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
           apiKey: "demo", authDomain: "demo.firebaseapp.com", projectId: "demo"
         };
@@ -482,30 +413,157 @@
 
         listenToRoom();
       } catch (err) {
-        console.error("Firebase init fallback:", err);
+        console.error("Firebase initialization failed:", err);
       }
     }
 
     function listenToRoom() {
-      const appId = typeof __app_id !== 'undefined' ? __app_id : 'mtg-rotisserie-discord';
+      if (!db || !roomId) return;
+      const appId = typeof __app_id !== 'undefined' ? __app_id : 'mtg-rotisserie-app';
       const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'drafts', roomId);
 
       onSnapshot(docRef, (snapshot) => {
         if (snapshot.exists()) {
           const data = snapshot.data();
-          appState = data.appState;
-          
-          if (myPlayerId === null && discordUser?.user?.username) {
-            const matchedIdx = appState.players.findIndex(p => p.name.toLowerCase() === discordUser.user.username.toLowerCase());
-            if (matchedIdx !== -1) {
-              myPlayerId = matchedIdx;
+          if (data && data.appState) {
+            appState = data.appState;
+            if (!window.location.hash.includes(`room=${roomId}`)) {
+              window.location.hash = `#room=${roomId}`;
             }
+            transitionToDraftScreen();
           }
-
-          transitionToDraftScreen();
         }
       }, (err) => {
-        console.error("Room sync error:", err);
+        console.error("Room snapshot listening error:", err);
+      });
+    }
+
+    // Quote-aware CSV line parsing
+    function parseCSVRow(text) {
+      const result = [];
+      let cell = '';
+      let inQuotes = false;
+      for (let i = 0; i < text.length; i++) {
+        const c = text[i];
+        if (c === '"') {
+          inQuotes = !inQuotes;
+        } else if (c === ',' && !inQuotes) {
+          result.push(cell.trim());
+          cell = '';
+        } else {
+          cell += c;
+        }
+      }
+      result.push(cell.trim());
+      return result;
+    }
+
+    function parseCardList(text) {
+      const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+      if (lines.length === 0) return [];
+
+      let nameColIndex = 0;
+      const firstRowCells = parseCSVRow(lines[0]);
+      let startIndex = 0;
+
+      const lowerCells = firstRowCells.map(c => c.replace(/^"|"$/g, '').toLowerCase());
+      const headerIdx = lowerCells.findIndex(c => ['name', 'card name', 'card', 'title'].includes(c));
+
+      if (headerIdx !== -1) {
+        nameColIndex = headerIdx;
+        startIndex = 1;
+      }
+
+      const cardNames = [];
+      for (let i = startIndex; i < lines.length; i++) {
+        const cells = parseCSVRow(lines[i]);
+        if (cells.length > nameColIndex) {
+          let rawName = cells[nameColIndex].replace(/^"|"$/g, '').trim();
+          rawName = rawName.replace(/^1x?\s+/, '');
+          if (rawName.length > 0) {
+            cardNames.push(rawName);
+          }
+        }
+      }
+      return cardNames;
+    }
+
+    async function fetchScryfallCards(cardNames) {
+      const progressContainer = document.getElementById('fetch-progress-container');
+      const progressStatus = document.getElementById('fetch-progress-status');
+      const progressCount = document.getElementById('fetch-progress-count');
+      const progressBar = document.getElementById('fetch-progress-bar');
+
+      progressContainer.classList.remove('hidden');
+      const uniqueNames = Array.from(new Set(cardNames));
+      const total = uniqueNames.length;
+      
+      progressStatus.innerText = 'Querying Scryfall API...';
+      progressCount.innerText = `0 / ${total}`;
+      progressBar.style.width = '0%';
+
+      const fetchedCardsMap = new Map();
+      const batchSize = 75;
+
+      for (let i = 0; i < total; i += batchSize) {
+        const chunk = uniqueNames.slice(i, i + batchSize);
+        const identifiers = chunk.map(name => ({ name }));
+
+        try {
+          const resp = await fetch('https://api.scryfall.com/cards/collection', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ identifiers })
+          });
+
+          if (resp.ok) {
+            const json = await resp.json();
+            if (json.data) {
+              json.data.forEach(card => {
+                let imgUrl = 'https://cards.scryfall.io/back.jpg';
+                if (card.image_uris && card.image_uris.normal) {
+                  imgUrl = card.image_uris.normal;
+                } else if (card.card_faces && card.card_faces[0]?.image_uris?.normal) {
+                  imgUrl = card.card_faces[0].image_uris.normal;
+                }
+
+                fetchedCardsMap.set(card.name.toLowerCase(), {
+                  name: card.name,
+                  type: card.type_line || 'Spell',
+                  cmc: card.cmc || 0,
+                  colors: card.color_identity && card.color_identity.length > 0 ? card.color_identity : ['C'],
+                  image: imgUrl,
+                  oracleText: card.oracle_text || ''
+                });
+              });
+            }
+          }
+        } catch (err) {
+          console.warn("Scryfall batch fetch request failed:", err);
+        }
+
+        const currentLoaded = Math.min(i + batchSize, total);
+        progressCount.innerText = `${currentLoaded} / ${total}`;
+        progressBar.style.width = `${Math.round((currentLoaded / total) * 100)}%`;
+      }
+
+      progressContainer.classList.add('hidden');
+
+      return cardNames.map((name, idx) => {
+        const found = fetchedCardsMap.get(name.toLowerCase());
+        if (found) {
+          return { ...found, id: `card-${idx}`, draftedBy: null };
+        }
+        return {
+          id: `card-${idx}`,
+          name: name,
+          type: 'Spell',
+          cmc: 3,
+          colors: ['C'],
+          image: 'https://cards.scryfall.io/back.jpg',
+          oracleText: '',
+          draftedBy: null
+        };
       });
     }
 
@@ -525,7 +583,7 @@
     window.loadPreset = function(type) {
       const poolInput = document.getElementById('input-card-pool');
       if (type === 'classic') {
-        poolInput.value = "Black Lotus\nMox Pearl\nMox Sapphire\nMox Jet\nMox Ruby\nMox Emerald\nTime Walk\nAncestral Recall\nTimetwister\nSol Ring\nMana Crypt\nLibrary of Alexandria\nRagavan, Nimble Pilferer\nOko, Thief of Crowns\nOrcish Bowmasters\nMinsc & Boo, Timeless Heroes\nTeferi, Time Raveler\nLightning Bolt\nCounterspell\nThoughtseize";
+        poolInput.value = "Black Lotus\nMox Pearl\nMox Sapphire\nMox Jet\nMox Ruby\nMox Emerald\nTime Walk\nAncestral Recall\nTimetwister\nSol Ring\nMana Crypt\nLibrary of Alexandria\nRagavan, Nimble Pilferer\nOko, Thief of Crowns\nOrcish Bowmasters\n\"Minsc & Boo, Timeless Heroes\"\n\"Teferi, Time Raveler\"\nLightning Bolt\nCounterspell\nThoughtseize";
       } else {
         poolInput.value = "Black Lotus\nMox Pearl\nMox Sapphire\nAncestral Recall\nTime Walk\nSol Ring\nMana Vault\nDemonic Tutor\nVampiric Tutor\nBrainstorm\nForce of Will\nSwords to Plowshares\nSnuff Out\nForce of Negation\nGrief\nFury\nSubtlety";
       }
@@ -550,27 +608,20 @@
       }
 
       const rawText = document.getElementById('input-card-pool').value;
-      const cardNames = rawText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+      const cardNames = parseCardList(rawText);
 
       if (cardNames.length === 0) {
         alert("Please enter or upload at least one card!");
         return;
       }
 
-      const cardPool = cardNames.map((name, idx) => ({
-        id: `card-${idx}`,
-        name: name.replace(/^1x?\s+/, ''),
-        type: 'Spell',
-        cmc: Math.floor(Math.random() * 5) + 1,
-        colors: ['W', 'U', 'B', 'R', 'G'][Math.floor(Math.random() * 5)],
-        image: 'https://cards.scryfall.io/back.jpg',
-        draftedBy: null
-      }));
+      const cardPool = await fetchScryfallCards(cardNames);
 
-      // Generate sequence
       const order = [];
       const mode = document.querySelector('input[name="draftMode"]:checked').value;
-      for (let round = 0; round < 10; round++) {
+      const rounds = Math.ceil((cardPool.length) / players.length) + 5;
+      
+      for (let round = 0; round < rounds; round++) {
         if (mode === 'snake') {
           const roundOrder = players.map(p => p.id);
           order.push(...(round % 2 === 0 ? roundOrder : roundOrder.reverse()));
@@ -588,8 +639,7 @@
         maxPicks: parseInt(document.getElementById('select-max-picks').value),
         picksPerTurn: parseInt(document.getElementById('select-picks-per-turn').value),
         turnTimer: parseInt(document.getElementById('select-turn-timer').value),
-        selectedRosterPlayerIndex: 0,
-        poolGrouping: 'type'
+        selectedRosterPlayerIndex: 0
       };
 
       await syncRoomState();
@@ -597,8 +647,8 @@
     };
 
     async function syncRoomState() {
-      if (!db) return;
-      const appId = typeof __app_id !== 'undefined' ? __app_id : 'mtg-rotisserie-discord';
+      if (!db || !roomId) return;
+      const appId = typeof __app_id !== 'undefined' ? __app_id : 'mtg-rotisserie-app';
       const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'drafts', roomId);
       await setDoc(docRef, { appState }, { merge: true });
     }
@@ -626,7 +676,6 @@
       document.getElementById('stat-cards-remaining').innerText = unpicked.length;
       document.getElementById('filtered-count').innerText = `${unpicked.length} Available`;
 
-      // Render Available Grid
       const gridContainer = document.getElementById('card-grid-container');
       gridContainer.innerHTML = '';
       
@@ -635,18 +684,19 @@
 
       unpicked.forEach(card => {
         if (activeFilters.text && !card.name.toLowerCase().includes(activeFilters.text.toLowerCase())) return;
-        
+        if (activeFilters.colors.length > 0 && !card.colors.some(c => activeFilters.colors.includes(c))) return;
+
         const el = document.createElement('div');
         el.className = 'bg-slate-950 border border-slate-800 rounded-xl p-2 cursor-pointer hover:border-indigo-500 transition card-hover flex flex-col justify-between';
         el.onclick = () => openPickModal(card);
         el.innerHTML = `
-          <div class="text-xs font-bold text-slate-200 truncate mb-1">${card.name}</div>
-          <div class="h-28 bg-slate-900 rounded-lg flex items-center justify-center text-slate-600 text-xs">
-            <i class="fa-solid fa-magic text-2xl"></i>
+          <div class="text-xs font-bold text-slate-200 truncate mb-1" title="${card.name}">${card.name}</div>
+          <div class="h-36 sm:h-44 rounded-lg overflow-hidden bg-slate-900 border border-slate-800">
+            <img src="${card.image}" alt="${card.name}" class="w-full h-full object-cover">
           </div>
           <div class="flex justify-between items-center mt-2 text-[10px] text-slate-400">
             <span>CMC: ${card.cmc}</span>
-            <span class="font-bold text-indigo-400">${card.colors}</span>
+            <span class="font-bold text-indigo-400">${card.colors.join('')}</span>
           </div>
         `;
         grid.appendChild(el);
@@ -692,14 +742,33 @@
       player.pool.forEach(card => {
         const row = document.createElement('div');
         row.className = 'flex justify-between items-center bg-slate-950 p-2 rounded-lg border border-slate-800 text-xs text-slate-300';
-        row.innerHTML = `<span>${card.name}</span> <span class="text-indigo-400 font-bold">${card.colors}</span>`;
+        row.innerHTML = `<span>${card.name}</span> <span class="text-indigo-400 font-bold">${card.colors.join('')}</span>`;
         container.appendChild(row);
       });
     }
 
+    window.onSearchChange = function(val) {
+      activeFilters.text = val;
+      renderBoard();
+    };
+
+    window.toggleColorFilter = function(c) {
+      const idx = activeFilters.colors.indexOf(c);
+      if (idx === -1) activeFilters.colors.push(c);
+      else activeFilters.colors.splice(idx, 1);
+      renderBoard();
+    };
+
+    window.resetFilters = function() {
+      activeFilters = { text: '', colors: [] };
+      document.getElementById('filter-search').value = '';
+      renderBoard();
+    };
+
     window.openPickModal = function(card) {
       pendingPickCard = card;
       document.getElementById('pick-modal-title').innerText = `Draft ${card.name}?`;
+      document.getElementById('pick-modal-card-preview').innerHTML = `<img src="${card.image}" alt="${card.name}" class="w-full h-auto">`;
       document.getElementById('pick-modal-desc').innerText = `Pick card for ${appState.players.find(p => p.id === appState.draftOrder[appState.currentPickIndex])?.name || 'Active Player'}`;
       document.getElementById('pick-modal').classList.remove('hidden');
     };
@@ -723,21 +792,79 @@
       renderBoard();
     };
 
+    window.undoLastPick = async function() {
+      if (appState.currentPickIndex <= 0) return;
+      appState.currentPickIndex--;
+      const prevPlayerId = appState.draftOrder[appState.currentPickIndex];
+      const player = appState.players.find(p => p.id === prevPlayerId);
+      if (player && player.pool.length > 0) {
+        const poppedCard = player.pool.pop();
+        const poolCard = appState.cardPool.find(c => c.id === poppedCard.id);
+        if (poolCard) poolCard.draftedBy = null;
+      }
+      await syncRoomState();
+      renderBoard();
+    };
+
+    window.exportPlayerDeck = function() {
+      const player = appState.players[appState.selectedRosterPlayerIndex];
+      if (!player || player.pool.length === 0) {
+        alert("Selected player deck is currently empty.");
+        return;
+      }
+      const text = player.pool.map(c => `1 ${c.name}`).join('\n');
+      const blob = new Blob([text], { type: 'text/plain' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `${player.name.replace(/\s+/g, '_')}_Decklist.txt`;
+      a.click();
+    };
+
+    window.toggleMobileDeckDrawer = function() {
+      const panel = document.getElementById('player-deck-panel');
+      panel.classList.toggle('hidden');
+    };
+
     window.copyRoomLink = function() {
       const url = `${window.location.origin}${window.location.pathname}#room=${roomId}`;
       navigator.clipboard.writeText(url);
-      alert(`Room URL copied to clipboard!\n${url}`);
+      alert(`Room link copied to clipboard:\n${url}`);
     };
 
     window.confirmReset = function() {
-      if (confirm("Reset current draft?")) {
+      if (confirm("Reset draft session and return to setup?")) {
         window.location.hash = '';
         window.location.reload();
       }
     };
 
+    window.openIdentityModal = function() {
+      const list = document.getElementById('identity-seats-list');
+      list.innerHTML = '';
+      appState.players.forEach(p => {
+        list.innerHTML += `
+          <button onclick="claimSeat(${p.id})" class="w-full text-left p-2.5 rounded-xl bg-slate-950 hover:bg-indigo-950 border border-slate-800 text-xs font-bold text-slate-200">
+            ${p.name}
+          </button>
+        `;
+      });
+      document.getElementById('identity-modal').classList.remove('hidden');
+    };
+
+    window.closeIdentityModal = function() {
+      document.getElementById('identity-modal').classList.add('hidden');
+    };
+
+    window.claimSeat = function(seatId) {
+      mySeatId = seatId;
+      const p = appState.players.find(pl => pl.id === seatId);
+      document.getElementById('current-identity-name').innerText = p ? p.name : 'Spectator';
+      closeIdentityModal();
+    };
+
     window.updatePlayerInputs(4);
-    initDiscord();
+    window.loadPreset('classic');
+    initRoomHash();
   </script>
 </body>
 </html>
