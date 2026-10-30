@@ -120,6 +120,11 @@
 
         <!-- Action Controls -->
         <div class="flex items-center space-x-2">
+          <!-- Persistence Status Badge -->
+          <span id="save-indicator" class="hidden text-[10px] bg-emerald-950/80 text-emerald-400 border border-emerald-800/80 px-2 py-1 rounded-lg flex items-center gap-1 font-mono">
+            <i class="fa-solid fa-floppy-disk"></i> Saved
+          </span>
+
           <button id="btn-undo" onclick="undoLastPick()" class="hidden text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg border border-slate-700 flex items-center gap-1.5 transition">
             <i class="fa-solid fa-rotate-left text-amber-400"></i> Undo Pick
           </button>
@@ -129,6 +134,43 @@
         </div>
       </div>
     </header>
+
+    <!-- RESUME SAVED DRAFT MODAL BANNER -->
+    <div id="resume-modal" class="hidden fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4">
+      <div class="bg-mtg-cardBg border border-indigo-500/60 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 text-center">
+        <div class="w-14 h-14 bg-indigo-950/80 rounded-full border border-indigo-500 text-indigo-400 flex items-center justify-center text-2xl mx-auto shadow-lg">
+          <i class="fa-solid fa-clock-rotate-left"></i>
+        </div>
+        <div>
+          <h3 class="text-xl font-cinzel font-bold text-white mb-1">Resume Saved Draft?</h3>
+          <p class="text-xs text-slate-400">An ongoing draft session was recovered from your local storage.</p>
+        </div>
+
+        <div id="resume-details-box" class="bg-slate-900/90 border border-slate-800 rounded-xl p-3.5 text-left text-xs space-y-1.5 font-mono">
+          <div class="flex justify-between text-slate-300">
+            <span>Saved Time:</span>
+            <span id="saved-draft-time" class="text-indigo-300">--</span>
+          </div>
+          <div class="flex justify-between text-slate-300">
+            <span>Progress:</span>
+            <span id="saved-draft-progress" class="text-emerald-400 font-bold">Pick 0 / 0</span>
+          </div>
+          <div class="flex justify-between text-slate-300">
+            <span>Players:</span>
+            <span id="saved-draft-players" class="text-slate-200">0 Players</span>
+          </div>
+        </div>
+
+        <div class="flex flex-col sm:flex-row gap-2.5 pt-2">
+          <button onclick="discardSavedDraftAndSetup()" class="flex-1 py-2.5 bg-slate-800 hover:bg-red-900/40 text-slate-300 hover:text-red-300 text-xs font-bold rounded-xl border border-slate-700 transition">
+            Discard & New Draft
+          </button>
+          <button onclick="resumeSavedDraft()" class="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg transition flex items-center justify-center gap-1.5">
+            <i class="fa-solid fa-play"></i> Resume Draft
+          </button>
+        </div>
+      </div>
+    </div>
 
     <!-- SCREEN 1: SETUP SCREEN -->
     <section id="screen-setup" class="flex-1 max-w-4xl w-full mx-auto p-4 sm:p-6 flex flex-col justify-center">
@@ -456,6 +498,8 @@
       ]
     };
 
+    const LOCAL_STORAGE_KEY = 'mtg_rotisserie_draft_save_v1';
+
     // STATE MANAGEMENT
     let appState = {
       players: [],
@@ -470,16 +514,91 @@
       filterType: '',
       viewMode: 'grid',
       poolDisplayMode: 'list', // 'list' or 'grid'
-      poolGrouping: 'type' // 'type' or 'cmc'
+      poolGrouping: 'type', // 'type' or 'cmc'
+      timestamp: null
     };
 
     let pendingPickCardId = null;
 
-    // INITIALIZATION
+    // INITIALIZATION & LOCAL STORAGE RESTORATION
     window.onload = function() {
       updatePlayerInputs(4);
       loadPreset('classic');
+      checkForSavedDraft();
     };
+
+    function saveStateToLocalStorage() {
+      try {
+        appState.timestamp = new Date().toLocaleString();
+        // Convert Set to Array for JSON serialization
+        const serializedState = {
+          ...appState,
+          activeColorFilters: Array.from(appState.activeColorFilters)
+        };
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(serializedState));
+
+        // Show brief save indicator
+        const indicator = document.getElementById('save-indicator');
+        if (indicator && !document.getElementById('screen-draft').classList.contains('hidden')) {
+          indicator.classList.remove('hidden');
+        }
+      } catch (err) {
+        console.warn("Could not save draft state to localStorage:", err);
+      }
+    }
+
+    function checkForSavedDraft() {
+      try {
+        const savedRaw = localStorage.getItem(LOCAL_STORAGE_KEY);
+        if (!savedRaw) return;
+
+        const saved = JSON.parse(savedRaw);
+        if (saved && saved.cardPool && saved.cardPool.length > 0) {
+          document.getElementById('saved-draft-time').innerText = saved.timestamp || 'Recent Session';
+          document.getElementById('saved-draft-progress').innerText = `Pick ${saved.currentPickIndex + 1} / ${saved.draftOrder ? saved.draftOrder.length : saved.cardPool.length}`;
+          document.getElementById('saved-draft-players').innerText = `${saved.players ? saved.players.length : 0} (${saved.players.map(p => p.name).join(', ')})`;
+          
+          document.getElementById('resume-modal').classList.remove('hidden');
+        }
+      } catch (err) {
+        console.warn("Failed to read saved draft state:", err);
+      }
+    }
+
+    function resumeSavedDraft() {
+      try {
+        const savedRaw = localStorage.getItem(LOCAL_STORAGE_KEY);
+        if (!savedRaw) return;
+
+        const saved = JSON.parse(savedRaw);
+        appState = {
+          ...saved,
+          activeColorFilters: new Set(saved.activeColorFilters || [])
+        };
+
+        document.getElementById('resume-modal').classList.add('hidden');
+        document.getElementById('screen-setup').classList.add('hidden');
+
+        if (appState.currentPickIndex >= appState.draftOrder.length) {
+          finishDraft();
+        } else {
+          document.getElementById('screen-draft').classList.remove('hidden');
+          document.getElementById('header-draft-stats').classList.remove('hidden');
+          document.getElementById('btn-undo').classList.remove('hidden');
+          document.getElementById('save-indicator').classList.remove('hidden');
+          updateDraftUI();
+        }
+      } catch (err) {
+        alert("Failed to restore saved draft session.");
+        discardSavedDraftAndSetup();
+      }
+    }
+
+    function discardSavedDraftAndSetup() {
+      localStorage.removeItem(LOCAL_STORAGE_KEY);
+      document.getElementById('resume-modal').classList.add('hidden');
+      document.getElementById('save-indicator').classList.add('hidden');
+    }
 
     function updatePlayerInputs(count) {
       document.getElementById('player-count-label').innerText = count;
@@ -666,7 +785,7 @@
         name: scry.name,
         colors: scry.colors || (scry.card_faces ? scry.card_faces[0].colors : []),
         color_identity: scry.color_identity || [],
-        cmc: scry.cmc || 0,
+        cmc: scry.cmc !== undefined ? scry.cmc : 0,
         type: typeLine,
         mana_cost: manaCost,
         image_url: img,
@@ -720,11 +839,14 @@
       appState.history = [];
       appState.selectedRosterPlayerIndex = 0;
 
+      saveStateToLocalStorage();
+
       // Transition Screens
       document.getElementById('screen-setup').classList.add('hidden');
       document.getElementById('screen-draft').classList.remove('hidden');
       document.getElementById('header-draft-stats').classList.remove('hidden');
       document.getElementById('btn-undo').classList.remove('hidden');
+      document.getElementById('save-indicator').classList.remove('hidden');
 
       updateDraftUI();
     }
@@ -1183,6 +1305,8 @@
         appState.selectedRosterPlayerIndex = appState.draftOrder[appState.currentPickIndex];
       }
 
+      saveStateToLocalStorage();
+
       if (appState.currentPickIndex >= appState.draftOrder.length) {
         finishDraft();
       } else {
@@ -1205,6 +1329,7 @@
         addLogEntry(`Undid pick: <em>${card.name}</em>`, true);
         
         appState.selectedRosterPlayerIndex = appState.draftOrder[appState.currentPickIndex];
+        saveStateToLocalStorage();
         updateDraftUI();
       }
     }
@@ -1223,6 +1348,7 @@
       document.getElementById('btn-undo').classList.add('hidden');
       document.getElementById('screen-summary').classList.remove('hidden');
 
+      saveStateToLocalStorage();
       renderSummaryScreen();
     }
 
@@ -1284,7 +1410,8 @@
     }
 
     function confirmReset() {
-      if (confirm("Are you sure you want to start a new draft? Current progress will be lost.")) {
+      if (confirm("Are you sure you want to start a new draft? Current progress will be permanently lost.")) {
+        localStorage.removeItem(LOCAL_STORAGE_KEY);
         location.reload();
       }
     }
