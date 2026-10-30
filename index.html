@@ -1,28 +1,109 @@
-<!-- ... existing code ... -->
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-950">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MTG Rotisserie Draft</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <!-- Google Fonts: Cinzel & Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            cinzel: ['Cinzel', 'serif']
+          },
+          colors: {
+            mtg: {
+              white: '#F8F6D8',
+              blue: '#0E68AB',
+              black: '#150B00',
+              red: '#D3202A',
+              green: '#00733E',
+              gold: '#C0A050',
+              cardBg: '#1e293b'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Custom scrollbars */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+    .card-hover { transition: transform 0.15s ease-in-out, box-shadow 0.15s ease-in-out; }
+    .card-hover:hover { transform: translateY(-4px); }
+  </style>
+</head>
+<body class="h-full text-slate-100 flex flex-col font-sans antialiased selection:bg-indigo-500 selection:text-white">
+
+  <!-- APP CONTAINER -->
+  <div id="app" class="min-h-screen flex flex-col justify-between">
+
+    <!-- HEADER / NAVIGATION BAR -->
+    <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-30 shadow-xl">
+      <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+        <!-- Logo / Title -->
+        <div class="flex items-center space-x-3 cursor-pointer" onclick="confirmReset()">
+          <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-600 via-indigo-600 to-emerald-600 p-[2px] shadow-lg">
+            <div class="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center">
+              <i class="fa-solid fa-cube text-amber-400 text-base"></i>
+            </div>
+          </div>
+          <div>
+            <h1 class="font-cinzel font-bold text-base tracking-wider text-white leading-none">ROTISSERIE</h1>
+            <p class="text-[10px] text-slate-400 font-medium tracking-widest uppercase mt-0.5">MTG Cube Draft</p>
+          </div>
+        </div>
+
+        <!-- Dynamic Header Stats (Draft Mode) -->
+        <div id="header-draft-stats" class="hidden flex items-center space-x-4 bg-slate-950/80 px-4 py-1.5 rounded-xl border border-slate-800">
+          <div class="text-xs">
+            <span class="text-slate-500 uppercase text-[10px] block font-semibold">Active Turn</span>
+            <span id="stat-current-turn" class="font-bold text-amber-400">Player 1</span>
+          </div>
+          <div class="h-6 w-px bg-slate-800"></div>
+          <div class="text-xs">
+            <span class="text-slate-500 uppercase text-[10px] block font-semibold">Remaining</span>
+            <span id="stat-cards-remaining" class="font-bold text-indigo-400">0 / 0</span>
+          </div>
+        </div>
+
         <!-- Action Controls -->
         <div class="flex items-center space-x-2">
           <!-- Room Share Button -->
-          <button id="btn-share-room" onclick="copyRoomLink()" class="hidden text-xs bg-indigo-950 hover:bg-indigo-900 text-indigo-300 border border-indigo-700/80 px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 font-mono">
+          <button id="btn-share-room" onclick="copyRoomLink()" class="hidden text-xs bg-indigo-950 hover:bg-indigo-900 text-indigo-300 border border-indigo-700/80 px-3 py-1.5 rounded-lg flex items-center gap-1.5 font-mono shadow-sm">
             <i class="fa-solid fa-share-nodes text-indigo-400"></i> Share Room
           </button>
 
           <!-- Persistence Status Badge -->
-          <span id="save-indicator" class="hidden text-[10px] bg-emerald-950/80 text-emerald-400 border border-emerald-800/80 px-2 py-1 rounded-lg flex items-center gap-1 font-mono">
+          <span id="save-indicator" class="hidden text-[10px] bg-emerald-950/80 text-emerald-400 border border-emerald-800/80 px-2.5 py-1.5 rounded-lg flex items-center gap-1 font-mono">
             <i class="fa-solid fa-floppy-disk"></i> Live Sync
           </span>
 
           <button id="btn-undo" onclick="undoLastPick()" class="hidden text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg border border-slate-700 flex items-center gap-1.5 transition">
-            <i class="fa-solid fa-rotate-left text-amber-400"></i> Undo Pick
+            <i class="fa-solid fa-rotate-left text-amber-400"></i> Undo
           </button>
-          <button id="btn-restart" onclick="confirmReset()" class="text-xs bg-slate-800 hover:bg-red-900/40 hover:text-red-300 text-slate-300 px-3 py-1.5 rounded-lg border border-slate-700 transition flex items-center gap-1.5">
-            <i class="fa-solid fa-power-off"></i> New Draft
+          <button id="btn-restart" onclick="confirmReset()" class="text-xs bg-slate-800 hover:bg-red-950/60 hover:text-red-300 text-slate-300 px-3 py-1.5 rounded-lg border border-slate-700 transition flex items-center gap-1.5">
+            <i class="fa-solid fa-power-off"></i> New
           </button>
         </div>
       </div>
     </header>
 
     <!-- ALERT BANNER FOR ERRORS -->
-    <div id="error-alert" class="hidden max-w-7xl mx-auto my-2 px-4">
+    <div id="error-alert" class="hidden max-w-7xl mx-auto my-2 px-4 w-full">
       <div class="bg-red-950/90 border border-red-700/80 text-red-200 text-xs p-3 rounded-xl flex justify-between items-center shadow-lg">
         <span id="error-alert-msg"><i class="fa-solid fa-triangle-exclamation text-red-400 mr-2"></i> An error occurred.</span>
         <button onclick="dismissAlert()" class="text-red-400 hover:text-white ml-2"><i class="fa-solid fa-xmark"></i></button>
@@ -30,21 +111,221 @@
     </div>
 
     <!-- PLAYER CLAIM IDENTITY BANNER -->
-    <div id="identity-bar" class="hidden bg-slate-900 border-b border-slate-800 py-1.5 px-4 text-xs">
+    <div id="identity-bar" class="hidden bg-slate-900/90 border-b border-slate-800 py-1.5 px-4 text-xs">
       <div class="max-w-7xl mx-auto flex justify-between items-center">
         <div class="flex items-center gap-2">
           <span class="text-slate-400">Your Identity:</span>
           <span id="current-identity-name" class="font-bold text-indigo-300 bg-indigo-950/80 border border-indigo-800/80 px-2 py-0.5 rounded">Unclaimed / Spectator</span>
         </div>
-        <button onclick="openIdentityModal()" class="text-[11px] text-indigo-400 hover:underline">
-          <i class="fa-solid fa-user-gear mr-1"></i> Claim Player Seat
+        <button onclick="openIdentityModal()" class="text-[11px] text-indigo-400 hover:underline flex items-center gap-1">
+          <i class="fa-solid fa-user-gear"></i> Change Seat
         </button>
       </div>
     </div>
 
+    <!-- MAIN CONTENT AREA -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 flex flex-col">
+
+      <!-- ================= SCREEN 1: SETUP CONTAINER ================= -->
+      <div id="screen-setup" class="max-w-3xl w-full mx-auto space-y-6">
+        
+        <div class="text-center space-y-2">
+          <h2 class="text-3xl font-cinzel font-bold text-white">Create Rotisserie Draft</h2>
+          <p class="text-xs text-slate-400 max-w-lg mx-auto">Set up player seats, paste a cube list or upload CSV/CubeCobra data, and launch a real-time synchronized draft room.</p>
+        </div>
+
+        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-2xl space-y-6">
+          
+          <!-- Player Configuration -->
+          <div>
+            <div class="flex justify-between items-center mb-3">
+              <label class="text-xs font-bold uppercase tracking-wider text-indigo-400">1. Player Configuration</label>
+              <div class="flex items-center space-x-2">
+                <span class="text-xs text-slate-400">Players:</span>
+                <select id="select-player-count" onchange="updatePlayerInputs(parseInt(this.value))" class="bg-slate-950 border border-slate-700 rounded-lg text-xs px-2 py-1 text-slate-200 focus:outline-none focus:border-indigo-500">
+                  <option value="2">2 Players</option>
+                  <option value="4" selected>4 Players</option>
+                  <option value="6">6 Players</option>
+                  <option value="8">8 Players</option>
+                </select>
+              </div>
+            </div>
+            <div id="player-inputs-container" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <!-- Dynamically populated -->
+            </div>
+          </div>
+
+          <hr class="border-slate-800">
+
+          <!-- Draft Mode Settings -->
+          <div>
+            <label class="text-xs font-bold uppercase tracking-wider text-indigo-400 block mb-3">2. Draft Format Options</label>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <label class="flex items-center space-x-3 p-3 bg-slate-950/60 rounded-xl border border-slate-800 cursor-pointer hover:border-slate-700">
+                <input type="radio" name="draftMode" value="snake" checked class="text-indigo-600 focus:ring-0">
+                <div>
+                  <span class="text-xs font-bold text-slate-200 block">Snake Draft</span>
+                  <span class="text-[10px] text-slate-400">1➔2➔3➔4➔4➔3➔2➔1 order</span>
+                </div>
+              </label>
+              <label class="flex items-center space-x-3 p-3 bg-slate-950/60 rounded-xl border border-slate-800 cursor-pointer hover:border-slate-700">
+                <input type="radio" name="draftMode" value="straight" class="text-indigo-600 focus:ring-0">
+                <div>
+                  <span class="text-xs font-bold text-slate-200 block">Straight Rotisserie</span>
+                  <span class="text-[10px] text-slate-400">1➔2➔3➔4➔1➔2➔3➔4 order</span>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <hr class="border-slate-800">
+
+          <!-- Cube Card Pool Input -->
+          <div class="space-y-3">
+            <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
+              <label class="text-xs font-bold uppercase tracking-wider text-indigo-400">3. Cube Card Pool Import</label>
+              
+              <!-- Preset Buttons & File Upload -->
+              <div class="flex flex-wrap items-center gap-2">
+                <button type="button" onclick="loadPreset('classic')" class="text-[11px] bg-slate-800 hover:bg-slate-700 text-slate-300 px-2.5 py-1 rounded-lg border border-slate-700">
+                  Power Cube Preset
+                </button>
+                <button type="button" onclick="loadPreset('vintage')" class="text-[11px] bg-slate-800 hover:bg-slate-700 text-slate-300 px-2.5 py-1 rounded-lg border border-slate-700">
+                  Vintage Cube
+                </button>
+                <label class="text-[11px] bg-indigo-950 hover:bg-indigo-900 text-indigo-300 px-2.5 py-1 rounded-lg border border-indigo-700/80 cursor-pointer">
+                  <i class="fa-solid fa-file-csv mr-1"></i> Upload File
+                  <input type="file" id="file-input" accept=".csv, .txt" onchange="handleFileUpload(event)" class="hidden">
+                </label>
+              </div>
+            </div>
+
+            <textarea id="input-card-pool" rows="8" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs font-mono text-slate-200 focus:outline-none focus:border-indigo-500 placeholder-slate-600 resize-y" placeholder="Paste card names line by line or CSV output..."></textarea>
+            <p class="text-[11px] text-slate-500">Supports raw card names, quantities (e.g. 1 Black Lotus), or official CubeCobra CSV exports.</p>
+          </div>
+
+          <!-- Launch Draft Button -->
+          <button id="btn-start-draft" onclick="startDraft()" class="w-full py-3.5 bg-gradient-to-r from-indigo-600 via-indigo-500 to-emerald-600 hover:from-indigo-500 hover:to-emerald-500 text-white font-cinzel font-bold text-sm rounded-xl shadow-lg transition duration-150 transform active:scale-[0.99] flex items-center justify-center gap-2">
+            <i class="fa-solid fa-play"></i> Create Synced Room & Launch
+          </button>
+
+        </div>
+      </div>
+
+
+      <!-- ================= SCREEN 2: DRAFT BOARD CONTAINER ================= -->
+      <div id="screen-draft" class="hidden flex-1 flex flex-col gap-4">
+
+        <!-- DRAFT TURN STATUS BANNER -->
+        <div id="turn-banner" class="bg-gradient-to-r from-slate-900 via-indigo-950/80 to-slate-900 border border-indigo-500/30 rounded-2xl p-4 shadow-xl flex flex-col md:flex-row justify-between items-center gap-3">
+          <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/50 flex items-center justify-center text-amber-400 text-lg">
+              <i class="fa-solid fa-crown"></i>
+            </div>
+            <div>
+              <span class="text-[10px] uppercase tracking-widest text-slate-400 block font-semibold">Current Turn Pick</span>
+              <h3 id="active-player-name" class="text-xl font-cinzel font-bold text-amber-300">Player 1</h3>
+            </div>
+          </div>
+
+          <!-- Draft Sequence Track -->
+          <div id="draft-track" class="flex items-center space-x-1 overflow-x-auto max-w-full py-1 px-2 bg-slate-950/60 rounded-xl border border-slate-800">
+            <!-- Rendered by JS -->
+          </div>
+        </div>
+
+        <!-- SEARCH & COLOR FILTERS BAR -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-3 flex flex-wrap gap-3 items-center justify-between">
+          <!-- Text Search -->
+          <div class="relative flex-1 min-w-[200px]">
+            <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-500 text-xs"></i>
+            <input type="text" id="filter-search" oninput="onSearchChange(this.value)" placeholder="Search card name or oracle text..." class="w-full bg-slate-950 border border-slate-700 rounded-xl pl-8 pr-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
+          </div>
+
+          <!-- Color Identity Toggle Buttons -->
+          <div class="flex items-center space-x-1">
+            <button onclick="toggleColorFilter('W')" id="filter-w" class="w-7 h-7 rounded-lg font-bold text-xs bg-slate-800 text-amber-100 hover:bg-slate-700 border border-slate-700">W</button>
+            <button onclick="toggleColorFilter('U')" id="filter-u" class="w-7 h-7 rounded-lg font-bold text-xs bg-slate-800 text-blue-300 hover:bg-slate-700 border border-slate-700">U</button>
+            <button onclick="toggleColorFilter('B')" id="filter-b" class="w-7 h-7 rounded-lg font-bold text-xs bg-slate-800 text-slate-400 hover:bg-slate-700 border border-slate-700">B</button>
+            <button onclick="toggleColorFilter('R')" id="filter-r" class="w-7 h-7 rounded-lg font-bold text-xs bg-slate-800 text-red-400 hover:bg-slate-700 border border-slate-700">R</button>
+            <button onclick="toggleColorFilter('G')" id="filter-g" class="w-7 h-7 rounded-lg font-bold text-xs bg-slate-800 text-emerald-400 hover:bg-slate-700 border border-slate-700">G</button>
+            <button onclick="toggleColorFilter('C')" id="filter-c" class="w-7 h-7 rounded-lg font-bold text-xs bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700">C</button>
+            <button onclick="resetFilters()" class="text-[11px] text-slate-400 hover:text-white px-2 py-1">Reset</button>
+          </div>
+
+          <!-- View Toggle -->
+          <div class="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800">
+            <button onclick="setViewMode('grid')" id="view-grid-btn" class="p-1.5 px-2.5 rounded-lg text-xs bg-indigo-600 text-white font-semibold">
+              <i class="fa-solid fa-border-all"></i>
+            </button>
+            <button onclick="setViewMode('list')" id="view-list-btn" class="p-1.5 px-2.5 rounded-lg text-xs text-slate-400 hover:text-white">
+              <i class="fa-solid fa-list"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- MAIN CUBE BOARD / PLAYER POOLS SPLIT -->
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 flex-1">
+
+          <!-- CARD POOL DRAFT BOARD (3 Cols on Large) -->
+          <div class="lg:col-span-3 flex flex-col bg-slate-900 border border-slate-800 rounded-2xl p-4 min-h-[400px]">
+            <div class="flex justify-between items-center mb-3">
+              <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Available Cube Cards</span>
+              <span id="filtered-count" class="text-xs font-mono text-slate-500">0 Cards</span>
+            </div>
+
+            <div id="card-grid-container" class="flex-1 overflow-y-auto max-h-[70vh] pr-1">
+              <!-- Dynamically populated Grid/List -->
+            </div>
+          </div>
+
+          <!-- PLAYER POOLS & DECKS DRAWER (1 Col) -->
+          <div class="flex flex-col bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-4">
+            
+            <!-- Player Select Tabs -->
+            <div>
+              <label class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-2">Inspect Player Deck</label>
+              <div id="player-tabs-container" class="grid grid-cols-2 gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
+                <!-- Dynamically populated -->
+              </div>
+            </div>
+
+            <!-- Player Deck Stats -->
+            <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-2">
+              <div class="flex justify-between text-xs">
+                <span class="text-slate-400">Drafted Total:</span>
+                <span id="player-pool-count" class="font-bold text-indigo-400 font-mono">0 Cards</span>
+              </div>
+              <div class="flex justify-between items-center text-xs">
+                <span class="text-slate-400">Grouping:</span>
+                <select id="pool-grouping-select" onchange="setPoolGrouping(this.value)" class="bg-slate-900 text-slate-300 border border-slate-700 rounded px-1.5 py-0.5 text-[11px]">
+                  <option value="type">By Type</option>
+                  <option value="cmc">By Mana Value</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Drafted Player Cards List -->
+            <div id="player-pool-cards" class="flex-1 overflow-y-auto max-h-[40vh] space-y-3 font-mono text-xs">
+              <!-- Dynamically populated -->
+            </div>
+
+            <!-- Export Deck Button -->
+            <button onclick="exportPlayerDeck()" class="w-full py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition">
+              <i class="fa-solid fa-download"></i> Export Decklist
+            </button>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </main>
+
     <!-- CLAIM IDENTITY MODAL -->
     <div id="identity-modal" class="hidden fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4">
-      <div class="bg-mtg-cardBg border border-indigo-500/60 rounded-2xl max-w-sm w-full p-6 shadow-2xl space-y-4">
+      <div class="bg-slate-900 border border-indigo-500/60 rounded-2xl max-w-sm w-full p-6 shadow-2xl space-y-4">
         <h3 class="text-lg font-cinzel font-bold text-white text-center">Select Your Seat</h3>
         <p class="text-xs text-slate-400 text-center">Choose which player in this draft session you are playing as:</p>
         <div id="identity-seats-list" class="space-y-2 max-h-60 overflow-y-auto">
@@ -55,24 +336,45 @@
         </button>
       </div>
     </div>
-<!-- ... existing code ... -->
+
+    <!-- PICK CONFIRMATION MODAL -->
+    <div id="pick-modal" class="hidden fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4">
+      <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 text-center">
+        <h3 class="text-lg font-cinzel font-bold text-white" id="pick-modal-title">Confirm Draft Pick</h3>
+        <div id="pick-modal-card-preview" class="max-w-[200px] mx-auto rounded-xl overflow-hidden shadow-lg border border-slate-800">
+          <!-- Card Image or fallback rendered here -->
+        </div>
+        <p id="pick-modal-desc" class="text-xs text-slate-300"></p>
+        <div class="flex items-center space-x-3 pt-2">
+          <button onclick="closePickModal()" class="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl text-xs">
+            Cancel
+          </button>
+          <button id="btn-confirm-pick" class="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs shadow-lg">
+            Confirm Pick
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- LOADING OVERLAY FOR SCRYFALL BATCH FETCH -->
     <div id="loading-overlay" class="hidden fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center">
       <div class="w-16 h-16 rounded-full border-4 border-indigo-500 border-t-transparent animate-spin mb-4"></div>
       <h3 class="text-xl font-cinzel font-bold text-white mb-1" id="loading-title">Fetching Magic Card Pool...</h3>
       <p id="loading-progress-text" class="text-xs text-indigo-300 font-mono">Querying Scryfall Collection API...</p>
       <div class="w-64 bg-slate-800 h-2 rounded-full mt-4 overflow-hidden border border-slate-700">
-        <div id="loading-bar-fill" class="bg-indigo-500 h-full w-0 transition-all duration-200" style="width: 0%;"></div>
+        <div id="loading-bar-fill" class="bg-indigo-500 h-full w-0 transition-all duration-200"></div>
       </div>
     </div>
-<!-- ... existing code ... -->
+
+  </div>
+
   <!-- JAVASCRIPT APP LOGIC -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
     import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
     import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-    // FIREBASE STATE INITIALIZATION
+    // FIREBASE INITIALIZATION
     let db = null;
     let auth = null;
     let myPlayerId = sessionStorage.getItem('mtg_rotisserie_my_player_id');
@@ -120,7 +422,7 @@
 
     const LOCAL_STORAGE_KEY = 'mtg_rotisserie_draft_save_v1';
 
-    // STATE MANAGEMENT
+    // GLOBAL APP STATE
     window.appState = {
       players: [],
       cardPool: [],
@@ -131,19 +433,62 @@
       selectedRosterPlayerIndex: 0,
       activeColorFilters: new Set(),
       filterSearch: '',
-      filterType: '',
       viewMode: 'grid',
-      poolDisplayMode: 'list',
-      poolGrouping: 'type',
-      timestamp: null
+      poolGrouping: 'type'
+    };
+
+    // SETUP INITIALIZERS
+    window.updatePlayerInputs = function(count) {
+      const container = document.getElementById('player-inputs-container');
+      if (!container) return;
+      container.innerHTML = '';
+      for (let i = 0; i < count; i++) {
+        container.innerHTML += `
+          <div class="flex items-center space-x-2">
+            <span class="text-slate-500 font-mono text-xs w-6 text-right">${i+1}.</span>
+            <input type="text" class="player-name-input flex-1 bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-slate-200 focus:border-indigo-500 focus:outline-none" value="Player ${i+1}" placeholder="Player ${i+1} Name">
+          </div>
+        `;
+      }
+    };
+
+    window.loadPreset = function(presetName) {
+      const textarea = document.getElementById('input-card-pool');
+      if (!textarea) return;
+      if (CUBE_PRESETS[presetName]) {
+        textarea.value = CUBE_PRESETS[presetName].join('\n');
+      }
+    };
+
+    window.parseCardList = function(rawText) {
+      if (!rawText) return [];
+      return rawText.split('\n')
+        .map(line => line.trim())
+        .filter(line => line.length > 0)
+        .map(line => {
+          let name = line.replace(/^\d+\s+x?\s*/i, '');
+          if (name.includes(',')) {
+             name = name.split(',')[0].replace(/"/g, '');
+          }
+          return name;
+        });
+    };
+
+    window.handleFileUpload = function(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        document.getElementById('input-card-pool').value = e.target.result;
+      };
+      reader.readAsText(file);
     };
 
     window.onload = async function() {
       await initFirebase();
       updatePlayerInputs(4);
       loadPreset('classic');
-      
-      // Check URL Hash for room join e.g. #room=ROOM_ID
+
       const hash = window.location.hash;
       if (hash && hash.startsWith('#room=')) {
         const roomId = hash.replace('#room=', '');
@@ -156,9 +501,27 @@
       checkForSavedDraft();
     };
 
+    window.checkForSavedDraft = function() {
+      const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
+      if (saved) {
+        if (confirm("A saved draft session was found locally. Would you like to resume it?")) {
+           try {
+               const data = JSON.parse(saved);
+               appState = {
+                 ...data,
+                 activeColorFilters: new Set(data.activeColorFilters || [])
+               };
+               transitionToDraftScreen();
+           } catch(e) {
+               console.error("Failed to parse local save:", e);
+           }
+        }
+      }
+    };
+
     function showErrorAlert(msg) {
       const box = document.getElementById('error-alert');
-      document.getElementById('error-alert-msg').innerText = msg;
+      document.getElementById('error-alert-msg').innerHTML = `<i class="fa-solid fa-triangle-exclamation text-red-400 mr-2"></i> ${msg}`;
       box.classList.remove('hidden');
     }
 
@@ -174,15 +537,15 @@
       const overlay = document.getElementById('loading-overlay');
       const progressText = document.getElementById('loading-progress-text');
       const barFill = document.getElementById('loading-bar-fill');
-      
-      document.getElementById('loading-title').innerText = "Fetching Card Data...";
+
+      document.getElementById('loading-title').innerText = "Fetching Magic Card Data...";
       overlay.classList.remove('hidden');
 
       const BATCH_SIZE = 75;
       for (let i = 0; i < uniqueNames.length; i += BATCH_SIZE) {
         const chunk = uniqueNames.slice(i, i + BATCH_SIZE);
         const currentCount = Math.min(i + BATCH_SIZE, uniqueNames.length);
-        
+
         progressText.innerText = `Scryfall API: ${currentCount} / ${uniqueNames.length} cards loaded...`;
         if (barFill) barFill.style.width = `${Math.round((currentCount / uniqueNames.length) * 100)}%`;
 
@@ -208,10 +571,10 @@
             }
           }
         } catch (err) {
-          console.warn('Scryfall batch fetch partial failure:', err);
+          console.warn('Scryfall batch fetch partial error:', err);
         }
 
-        await new Promise(r => setTimeout(r, 80));
+        await new Promise(r => setTimeout(r, 60));
       }
 
       overlay.classList.add('hidden');
@@ -258,9 +621,12 @@
         const parsedCardNames = parseCardList(rawCardText);
 
         if (parsedCardNames.length < playerNames.length) {
-          showErrorAlert(`Please enter at least ${playerNames.length} valid cards to draft.`);
+          showErrorAlert(`Please enter at least ${playerNames.length} cards to draft.`);
           return;
         }
+
+        const draftMode = document.querySelector('input[name="draftMode"]:checked')?.value || 'snake';
+        appState.draftMode = draftMode;
 
         // Fetch Scryfall Data
         const scryfallMap = await fetchScryfallBatch(parsedCardNames);
@@ -293,36 +659,40 @@
         appState.history = [];
         appState.selectedRosterPlayerIndex = 0;
 
-        // Create Room ID
         activeRoomId = 'room-' + Math.random().toString(36).substring(2, 9);
         window.location.hash = `room=${activeRoomId}`;
 
         await syncRoomToFirebase();
         listenToRoom(activeRoomId);
 
-        document.getElementById('screen-setup').classList.add('hidden');
-        document.getElementById('screen-draft').classList.remove('hidden');
-        document.getElementById('header-draft-stats').classList.remove('hidden');
-        document.getElementById('btn-undo').classList.remove('hidden');
-        document.getElementById('btn-share-room').classList.remove('hidden');
-        document.getElementById('save-indicator').classList.remove('hidden');
-        document.getElementById('identity-bar').classList.remove('hidden');
-
-        updateIdentityUI();
-        updateDraftUI();
+        transitionToDraftScreen();
       } catch (err) {
-        console.error("Failed to start draft:", err);
-        showErrorAlert("Failed to start draft room: " + err.message);
+        console.error("Failed to launch room:", err);
+        showErrorAlert("Room launch failed: " + err.message);
       }
     };
 
-    async function syncRoomToFirebase() {
-      if (!db || !activeRoomId) {
-        saveStateToLocalStorage();
-        return;
+    function generateDraftOrder(totalCards, numPlayers) {
+      appState.draftOrder = [];
+      let round = 0;
+      while (appState.draftOrder.length < totalCards) {
+        if (appState.draftMode === 'snake' && round % 2 === 1) {
+          for (let p = numPlayers - 1; p >= 0; p--) {
+            if (appState.draftOrder.length < totalCards) appState.draftOrder.push(p);
+          }
+        } else {
+          for (let p = 0; p < numPlayers; p++) {
+            if (appState.draftOrder.length < totalCards) appState.draftOrder.push(p);
+          }
+        }
+        round++;
       }
+    }
+
+    async function syncRoomToFirebase() {
+      saveStateToLocalStorage();
+      if (!db || !activeRoomId) return;
       try {
-        appState.timestamp = new Date().toLocaleString();
         const payload = {
           ...appState,
           activeColorFilters: Array.from(appState.activeColorFilters)
@@ -330,8 +700,7 @@
         const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'drafts', activeRoomId);
         await setDoc(roomRef, payload, { merge: true });
       } catch (err) {
-        console.warn("Firestore sync write failed, saving locally:", err);
-        saveStateToLocalStorage();
+        console.warn("Firestore sync write failed, state saved locally:", err);
       }
     }
 
@@ -353,12 +722,12 @@
             listenToRoom(roomId);
             transitionToDraftScreen();
           } else {
-            showErrorAlert(`Room '${roomId}' not found. Created new setup session.`);
+            showErrorAlert(`Room '${roomId}' not found.`);
             document.getElementById('loading-overlay').classList.add('hidden');
           }
         } catch (err) {
           console.error("Error joining draft room:", err);
-          showErrorAlert("Could not load synced draft room. Loading cached state.");
+          showErrorAlert("Could not load draft room. Reverting to local setup.");
           document.getElementById('loading-overlay').classList.add('hidden');
         }
       } else {
@@ -408,7 +777,7 @@
       dummy.select();
       document.execCommand("copy");
       document.body.removeChild(dummy);
-      alert("Draft Room Link copied to clipboard! Share this URL with all participants.");
+      alert("Draft Room Link copied to clipboard! Share this URL with your draft group.");
     };
 
     window.openIdentityModal = function() {
@@ -420,7 +789,7 @@
         btn.className = `w-full p-2.5 rounded-xl border text-left text-xs font-semibold transition flex justify-between items-center ${
           myPlayerId == p.id 
             ? 'bg-indigo-600 text-white border-indigo-400' 
-            : 'bg-slate-900 border-slate-700 text-slate-200 hover:border-indigo-500'
+            : 'bg-slate-950 border-slate-700 text-slate-200 hover:border-indigo-500'
         }`;
         btn.onclick = () => {
           myPlayerId = p.id;
@@ -451,7 +820,6 @@
 
     function saveStateToLocalStorage() {
       try {
-        appState.timestamp = new Date().toLocaleString();
         const serializedState = {
           ...appState,
           activeColorFilters: Array.from(appState.activeColorFilters)
@@ -462,22 +830,37 @@
       }
     }
 
-    function generateDraftOrder(totalCards, numPlayers) {
-      appState.draftOrder = [];
-      let round = 0;
-      while (appState.draftOrder.length < totalCards) {
-        if (appState.draftMode === 'snake' && round % 2 === 1) {
-          for (let p = numPlayers - 1; p >= 0; p--) {
-            if (appState.draftOrder.length < totalCards) appState.draftOrder.push(p);
-          }
-        } else {
-          for (let p = 0; p < numPlayers; p++) {
-            if (appState.draftOrder.length < totalCards) appState.draftOrder.push(p);
-          }
-        }
-        round++;
+    window.promptPick = function(cardId) {
+      const card = appState.cardPool.find(c => c.id === cardId);
+      if (!card || card.draftedBy !== null) return;
+
+      const activePlayerIndex = appState.draftOrder[appState.currentPickIndex];
+      const activePlayer = appState.players[activePlayerIndex];
+
+      if (myPlayerId !== null && parseInt(myPlayerId) !== activePlayerIndex) {
+        alert(`It is currently ${activePlayer.name}'s turn to pick.`);
+        return;
       }
-    }
+
+      document.getElementById('pick-modal-title').innerText = `Draft ${card.name}?`;
+      document.getElementById('pick-modal-desc').innerHTML = `Assigned to: <strong class="text-amber-400">${activePlayer.name}</strong>`;
+
+      const preview = document.getElementById('pick-modal-card-preview');
+      if (card.image_url) {
+        preview.innerHTML = `<img src="${card.image_url}" alt="${card.name}" class="w-full h-auto">`;
+      } else {
+        preview.innerHTML = `<div class="p-6 bg-slate-800 text-center font-bold text-xs">${card.name}<br><span class="text-[10px] font-normal text-slate-400">${card.type}</span></div>`;
+      }
+
+      const confirmBtn = document.getElementById('btn-confirm-pick');
+      confirmBtn.onclick = () => executePick(cardId);
+
+      document.getElementById('pick-modal').classList.remove('hidden');
+    };
+
+    window.closePickModal = function() {
+      document.getElementById('pick-modal').classList.add('hidden');
+    };
 
     window.executePick = async function(cardId) {
       const card = appState.cardPool.find(c => c.id === cardId);
@@ -485,12 +868,6 @@
 
       const activePlayerIndex = appState.draftOrder[appState.currentPickIndex];
       const activePlayer = appState.players[activePlayerIndex];
-
-      // Turn Lock Enforcement
-      if (myPlayerId !== null && parseInt(myPlayerId) !== activePlayerIndex) {
-        alert(`It is currently ${activePlayer.name}'s pick turn.`);
-        return;
-      }
 
       card.draftedBy = activePlayerIndex;
       activePlayer.pool.push(card);
@@ -501,22 +878,15 @@
         playerIndex: activePlayerIndex
       });
 
-      addLogEntry(`${activePlayer.name} picked <strong>${card.name}</strong>`);
       closePickModal();
 
       appState.currentPickIndex++;
-
       if (appState.currentPickIndex < appState.draftOrder.length) {
         appState.selectedRosterPlayerIndex = appState.draftOrder[appState.currentPickIndex];
       }
 
       await syncRoomToFirebase();
-
-      if (appState.currentPickIndex >= appState.draftOrder.length) {
-        finishDraft();
-      } else {
-        updateDraftUI();
-      }
+      updateDraftUI();
     };
 
     window.undoLastPick = async function() {
@@ -530,8 +900,6 @@
         card.draftedBy = null;
         player.pool = player.pool.filter(c => c.id !== card.id);
         appState.currentPickIndex = lastPick.pickIndex;
-
-        addLogEntry(`Undid pick: <em>${card.name}</em>`, true);
         appState.selectedRosterPlayerIndex = appState.draftOrder[appState.currentPickIndex];
 
         await syncRoomToFirebase();
@@ -539,6 +907,298 @@
       }
     };
 
-    // ... existing UI rendering helper functions (parseCardList, renderDraftOrderTrack, renderCardsGrid, etc.) ...
+    window.confirmReset = function() {
+      if (confirm("Start a new draft? All active picks will be cleared.")) {
+        localStorage.removeItem(LOCAL_STORAGE_KEY);
+        window.location.hash = '';
+        window.location.reload();
+      }
+    };
+
+    // SEARCH & FILTER HANDLERS
+    window.onSearchChange = function(val) {
+      appState.filterSearch = val.toLowerCase();
+      renderCardsPool();
+    };
+
+    window.toggleColorFilter = function(color) {
+      if (appState.activeColorFilters.has(color)) {
+        appState.activeColorFilters.delete(color);
+      } else {
+        appState.activeColorFilters.add(color);
+      }
+      
+      ['w','u','b','r','g','c'].forEach(c => {
+        const btn = document.getElementById(`filter-${c}`);
+        if (!btn) return;
+        if (appState.activeColorFilters.has(c.toUpperCase())) {
+          btn.classList.add('ring-2', 'ring-indigo-500', 'bg-indigo-950');
+        } else {
+          btn.classList.remove('ring-2', 'ring-indigo-500', 'bg-indigo-950');
+        }
+      });
+
+      renderCardsPool();
+    };
+
+    window.resetFilters = function() {
+      appState.activeColorFilters.clear();
+      appState.filterSearch = '';
+      document.getElementById('filter-search').value = '';
+      ['w','u','b','r','g','c'].forEach(c => {
+        const btn = document.getElementById(`filter-${c}`);
+        if (btn) btn.classList.remove('ring-2', 'ring-indigo-500', 'bg-indigo-950');
+      });
+      renderCardsPool();
+    };
+
+    window.setViewMode = function(mode) {
+      appState.viewMode = mode;
+      document.getElementById('view-grid-btn').className = mode === 'grid' ? 'p-1.5 px-2.5 rounded-lg text-xs bg-indigo-600 text-white font-semibold' : 'p-1.5 px-2.5 rounded-lg text-xs text-slate-400 hover:text-white';
+      document.getElementById('view-list-btn').className = mode === 'list' ? 'p-1.5 px-2.5 rounded-lg text-xs bg-indigo-600 text-white font-semibold' : 'p-1.5 px-2.5 rounded-lg text-xs text-slate-400 hover:text-white';
+      renderCardsPool();
+    };
+
+    window.setPoolGrouping = function(grouping) {
+      appState.poolGrouping = grouping;
+      renderPlayerPool();
+    };
+
+    // UI RENDERERS
+    function updateDraftUI() {
+      const activePlayerIndex = appState.draftOrder[appState.currentPickIndex];
+      const activePlayer = appState.players[activePlayerIndex];
+
+      if (activePlayer) {
+        document.getElementById('stat-current-turn').innerText = activePlayer.name;
+        document.getElementById('active-player-name').innerText = `${activePlayer.name}'s Pick`;
+      } else {
+        document.getElementById('stat-current-turn').innerText = "Draft Complete";
+        document.getElementById('active-player-name').innerText = "Draft Complete";
+      }
+
+      const total = appState.cardPool.length;
+      const drafted = appState.cardPool.filter(c => c.draftedBy !== null).length;
+      document.getElementById('stat-cards-remaining').innerText = `${total - drafted} / ${total}`;
+
+      renderDraftTrack();
+      renderCardsPool();
+      renderPlayerTabs();
+      renderPlayerPool();
+    }
+
+    function renderDraftTrack() {
+      const container = document.getElementById('draft-track');
+      container.innerHTML = '';
+
+      const start = Math.max(0, appState.currentPickIndex - 2);
+      const end = Math.min(appState.draftOrder.length, appState.currentPickIndex + 6);
+
+      for (let i = start; i < end; i++) {
+        const playerIdx = appState.draftOrder[i];
+        const player = appState.players[playerIdx];
+        const isCurrent = i === appState.currentPickIndex;
+
+        const badge = document.createElement('div');
+        badge.className = `px-2.5 py-1 rounded-lg text-[10px] font-bold whitespace-nowrap border flex items-center gap-1 ${
+          isCurrent 
+            ? 'bg-amber-500 text-slate-950 border-amber-300 shadow-md scale-105' 
+            : i < appState.currentPickIndex 
+              ? 'bg-slate-900 text-slate-500 border-slate-800 line-through' 
+              : 'bg-slate-900 text-slate-400 border-slate-800'
+        }`;
+        badge.innerHTML = `<span>#${i+1}</span> <span>${player ? player.name : 'P'+(playerIdx+1)}</span>`;
+        container.appendChild(badge);
+      }
+    }
+
+    function renderCardsPool() {
+      const container = document.getElementById('card-grid-container');
+      container.innerHTML = '';
+
+      const filtered = appState.cardPool.filter(card => {
+        if (appState.filterSearch) {
+          const nameMatch = card.name.toLowerCase().includes(appState.filterSearch);
+          const oracleMatch = card.oracle_text.toLowerCase().includes(appState.filterSearch);
+          if (!nameMatch && !oracleMatch) return false;
+        }
+
+        if (appState.activeColorFilters.size > 0) {
+          if (appState.activeColorFilters.has('C')) {
+            if (card.colors && card.colors.length > 0) return false;
+          } else {
+            const hasColor = card.colors && card.colors.some(c => appState.activeColorFilters.has(c));
+            if (!hasColor) return false;
+          }
+        }
+
+        return true;
+      });
+
+      document.getElementById('filtered-count').innerText = `${filtered.length} Cards`;
+
+      if (appState.viewMode === 'grid') {
+        container.className = 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3 p-1';
+        filtered.forEach(card => {
+          const isDrafted = card.draftedBy !== null;
+          const draftedPlayer = isDrafted ? appState.players[card.draftedBy] : null;
+
+          const el = document.createElement('div');
+          el.className = `relative rounded-xl overflow-hidden border card-hover ${
+            isDrafted 
+              ? 'bg-slate-950/80 border-slate-800 opacity-40 grayscale' 
+              : 'bg-slate-800 border-slate-700 hover:border-indigo-500 cursor-pointer shadow-md'
+          }`;
+
+          if (!isDrafted) {
+            el.onclick = () => promptPick(card.id);
+          }
+
+          if (card.image_url) {
+            el.innerHTML = `
+              <img src="${card.image_url}" alt="${card.name}" class="w-full h-auto block" loading="lazy">
+              ${isDrafted ? `<div class="absolute inset-0 bg-black/70 flex items-center justify-center p-2 text-center text-amber-400 font-bold text-xs font-cinzel">${draftedPlayer ? draftedPlayer.name : 'Drafted'}</div>` : ''}
+            `;
+          } else {
+            el.innerHTML = `
+              <div class="p-3 h-36 flex flex-col justify-between">
+                <div>
+                  <h4 class="font-bold text-xs text-white leading-tight">${card.name}</h4>
+                  <span class="text-[9px] text-slate-400 block mt-1">${card.type}</span>
+                </div>
+                <div class="text-[10px] text-indigo-300 font-mono">${card.mana_cost || ''}</div>
+              </div>
+              ${isDrafted ? `<div class="absolute inset-0 bg-black/70 flex items-center justify-center p-2 text-center text-amber-400 font-bold text-xs font-cinzel">${draftedPlayer ? draftedPlayer.name : 'Drafted'}</div>` : ''}
+            `;
+          }
+
+          container.appendChild(el);
+        });
+      } else {
+        container.className = 'space-y-1.5 p-1';
+        filtered.forEach(card => {
+          const isDrafted = card.draftedBy !== null;
+          const draftedPlayer = isDrafted ? appState.players[card.draftedBy] : null;
+
+          const row = document.createElement('div');
+          row.className = `p-2.5 rounded-xl border flex items-center justify-between text-xs transition ${
+            isDrafted 
+              ? 'bg-slate-950 border-slate-800 opacity-40 text-slate-500' 
+              : 'bg-slate-800/80 border-slate-700 hover:border-indigo-500 cursor-pointer text-slate-200'
+          }`;
+
+          if (!isDrafted) {
+            row.onclick = () => promptPick(card.id);
+          }
+
+          row.innerHTML = `
+            <div class="flex items-center space-x-3">
+              <span class="font-bold text-white">${card.name}</span>
+              <span class="text-[10px] text-slate-400">${card.type}</span>
+            </div>
+            <div class="flex items-center space-x-3">
+              <span class="font-mono text-[10px] text-indigo-300">${card.mana_cost}</span>
+              ${isDrafted ? `<span class="text-[10px] bg-slate-900 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded font-bold">${draftedPlayer ? draftedPlayer.name : 'Drafted'}</span>` : ''}
+            </div>
+          `;
+          container.appendChild(row);
+        });
+      }
+    }
+
+    function renderPlayerTabs() {
+      const container = document.getElementById('player-tabs-container');
+      container.innerHTML = '';
+
+      appState.players.forEach((player, idx) => {
+        const btn = document.createElement('button');
+        const isActive = idx === appState.selectedRosterPlayerIndex;
+        btn.className = `py-1.5 px-2 rounded-lg text-xs font-semibold transition truncate ${
+          isActive 
+            ? 'bg-indigo-600 text-white shadow' 
+            : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+        }`;
+        btn.innerText = player.name;
+        btn.onclick = () => {
+          appState.selectedRosterPlayerIndex = idx;
+          renderPlayerTabs();
+          renderPlayerPool();
+        };
+        container.appendChild(btn);
+      });
+    }
+
+    function renderPlayerPool() {
+      const container = document.getElementById('player-pool-cards');
+      container.innerHTML = '';
+
+      const player = appState.players[appState.selectedRosterPlayerIndex];
+      if (!player) return;
+
+      document.getElementById('player-pool-count').innerText = `${player.pool.length} Cards`;
+
+      if (player.pool.length === 0) {
+        container.innerHTML = `<div class="text-center py-8 text-slate-600 text-xs italic">No cards drafted yet.</div>`;
+        return;
+      }
+
+      let groups = {};
+      if (appState.poolGrouping === 'cmc') {
+        player.pool.forEach(c => {
+          const key = `Mana Value ${c.cmc || 0}`;
+          if (!groups[key]) groups[key] = [];
+          groups[key].push(c);
+        });
+      } else {
+        player.pool.forEach(c => {
+          let key = 'Other';
+          const t = (c.type || '').toLowerCase();
+          if (t.includes('creature')) key = 'Creatures';
+          else if (t.includes('instant')) key = 'Instants';
+          else if (t.includes('sorcery')) key = 'Sorceries';
+          else if (t.includes('planeswalker')) key = 'Planeswalkers';
+          else if (t.includes('artifact')) key = 'Artifacts';
+          else if (t.includes('enchantment')) key = 'Enchantments';
+          else if (t.includes('land')) key = 'Lands';
+
+          if (!groups[key]) groups[key] = [];
+          groups[key].push(c);
+        });
+      }
+
+      Object.keys(groups).forEach(groupTitle => {
+        const sec = document.createElement('div');
+        sec.className = 'space-y-1';
+        sec.innerHTML = `<div class="text-[10px] font-bold uppercase tracking-wider text-indigo-400 border-b border-slate-800 pb-0.5">${groupTitle} (${groups[groupTitle].length})</div>`;
+
+        groups[groupTitle].forEach(card => {
+          const row = document.createElement('div');
+          row.className = 'p-1.5 bg-slate-950 rounded border border-slate-800/80 flex justify-between items-center text-[11px]';
+          row.innerHTML = `
+            <span class="text-slate-200 font-medium truncate">${card.name}</span>
+            <span class="text-[10px] text-indigo-300 font-mono ml-2">${card.mana_cost || ''}</span>
+          `;
+          sec.appendChild(row);
+        });
+
+        container.appendChild(sec);
+      });
+    }
+
+    window.exportPlayerDeck = function() {
+      const player = appState.players[appState.selectedRosterPlayerIndex];
+      if (!player || player.pool.length === 0) {
+        alert("No cards in player pool to export.");
+        return;
+      }
+
+      const text = player.pool.map(c => `1 ${c.name}`).join('\n');
+      const blob = new Blob([text], { type: 'text/plain' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `${player.name.replace(/\s+/g, '_')}_Decklist.txt`;
+      a.click();
+    };
   </script>
-<!-- ... existing code -->
+</body>
+</html>
