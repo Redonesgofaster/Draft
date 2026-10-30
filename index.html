@@ -131,7 +131,7 @@
         
         <div class="text-center space-y-2">
           <h2 class="text-3xl font-cinzel font-bold text-white">Create Rotisserie Draft</h2>
-          <p class="text-xs text-slate-400 max-w-lg mx-auto">Set up player seats, paste a cube list or upload CSV/CubeCobra data, and launch a real-time synchronized draft room.</p>
+          <p class="text-xs text-slate-400 max-w-lg mx-auto">Set up player seats, draft rules, paste a cube list or upload CSV/CubeCobra data, and launch a real-time synchronized draft room.</p>
         </div>
 
         <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-2xl space-y-6">
@@ -157,24 +157,61 @@
 
           <hr class="border-slate-800">
 
-          <!-- Draft Mode Settings -->
+          <!-- Draft Mode & Rule Settings -->
           <div>
-            <label class="text-xs font-bold uppercase tracking-wider text-indigo-400 block mb-3">2. Draft Format Options</label>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <label class="flex items-center space-x-3 p-3 bg-slate-950/60 rounded-xl border border-slate-800 cursor-pointer hover:border-slate-700">
-                <input type="radio" name="draftMode" value="snake" checked class="text-indigo-600 focus:ring-0">
+            <label class="text-xs font-bold uppercase tracking-wider text-indigo-400 block mb-3">2. Draft Rules & Timer Controls</label>
+            
+            <div class="space-y-4">
+              <!-- Order Format -->
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <label class="flex items-center space-x-3 p-3 bg-slate-950/60 rounded-xl border border-slate-800 cursor-pointer hover:border-slate-700">
+                  <input type="radio" name="draftMode" value="snake" checked class="text-indigo-600 focus:ring-0">
+                  <div>
+                    <span class="text-xs font-bold text-slate-200 block">Snake Draft</span>
+                    <span class="text-[10px] text-slate-400">1➔2➔3➔4➔4➔3➔2➔1 order</span>
+                  </div>
+                </label>
+                <label class="flex items-center space-x-3 p-3 bg-slate-950/60 rounded-xl border border-slate-800 cursor-pointer hover:border-slate-700">
+                  <input type="radio" name="draftMode" value="straight" class="text-indigo-600 focus:ring-0">
+                  <div>
+                    <span class="text-xs font-bold text-slate-200 block">Straight Rotisserie</span>
+                    <span class="text-[10px] text-slate-400">1➔2➔3➔4➔1➔2➔3➔4 order</span>
+                  </div>
+                </label>
+              </div>
+
+              <!-- Limit & Multi-Pick Options -->
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <span class="text-xs font-bold text-slate-200 block">Snake Draft</span>
-                  <span class="text-[10px] text-slate-400">1➔2➔3➔4➔4➔3➔2➔1 order</span>
+                  <label class="text-[11px] font-medium text-slate-400 block mb-1">Max Picks Per Player</label>
+                  <select id="select-max-picks" class="w-full bg-slate-950 border border-slate-700 rounded-lg text-xs p-2 text-slate-200 focus:outline-none focus:border-indigo-500">
+                    <option value="0" selected>Unlimited (Until Empty)</option>
+                    <option value="15">15 Cards</option>
+                    <option value="23">23 Cards</option>
+                    <option value="30">30 Cards</option>
+                    <option value="45">45 Cards</option>
+                  </select>
                 </div>
-              </label>
-              <label class="flex items-center space-x-3 p-3 bg-slate-950/60 rounded-xl border border-slate-800 cursor-pointer hover:border-slate-700">
-                <input type="radio" name="draftMode" value="straight" class="text-indigo-600 focus:ring-0">
+
                 <div>
-                  <span class="text-xs font-bold text-slate-200 block">Straight Rotisserie</span>
-                  <span class="text-[10px] text-slate-400">1➔2➔3➔4➔1➔2➔3➔4 order</span>
+                  <label class="text-[11px] font-medium text-slate-400 block mb-1">Picks Per Turn</label>
+                  <select id="select-picks-per-turn" class="w-full bg-slate-950 border border-slate-700 rounded-lg text-xs p-2 text-slate-200 focus:outline-none focus:border-indigo-500">
+                    <option value="1" selected>1 Card</option>
+                    <option value="2">2 Cards (Double Pick)</option>
+                  </select>
                 </div>
-              </label>
+
+                <div>
+                  <label class="text-[11px] font-medium text-slate-400 block mb-1">Turn Pick Timer</label>
+                  <select id="select-turn-timer" class="w-full bg-slate-950 border border-slate-700 rounded-lg text-xs p-2 text-slate-200 focus:outline-none focus:border-indigo-500">
+                    <option value="0" selected>Disabled (No Timer)</option>
+                    <option value="15">15 Seconds</option>
+                    <option value="30">30 Seconds</option>
+                    <option value="60">60 Seconds</option>
+                    <option value="120">2 Minutes</option>
+                  </select>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -224,7 +261,12 @@
             </div>
             <div>
               <span class="text-[10px] uppercase tracking-widest text-slate-400 block font-semibold">Current Turn Pick</span>
-              <h3 id="active-player-name" class="text-xl font-cinzel font-bold text-amber-300">Player 1</h3>
+              <div class="flex items-center gap-3">
+                <h3 id="active-player-name" class="text-xl font-cinzel font-bold text-amber-300">Player 1</h3>
+                <span id="turn-timer-display" class="hidden text-xs font-mono font-bold bg-red-950/80 border border-red-700 text-red-300 px-2 py-0.5 rounded-lg animate-pulse">
+                  <i class="fa-solid fa-stopwatch mr-1"></i><span id="timer-sec">00</span>s
+                </span>
+              </div>
             </div>
           </div>
 
@@ -380,6 +422,8 @@
     let myPlayerId = sessionStorage.getItem('mtg_rotisserie_my_player_id');
     let activeRoomId = null;
     let unsubscribeRoomListener = null;
+    let timerInterval = null;
+    let currentTimerSeconds = 0;
 
     const appId = typeof __app_id !== 'undefined' ? __app_id : 'rotisserie-draft-default';
 
@@ -429,6 +473,9 @@
       draftOrder: [],
       currentPickIndex: 0,
       draftMode: 'snake',
+      maxPicksPerPlayer: 0,
+      picksPerTurn: 1,
+      turnTimerSeconds: 0,
       history: [],
       selectedRosterPlayerIndex: 0,
       activeColorFilters: new Set(),
@@ -625,8 +672,10 @@
           return;
         }
 
-        const draftMode = document.querySelector('input[name="draftMode"]:checked')?.value || 'snake';
-        appState.draftMode = draftMode;
+        appState.draftMode = document.querySelector('input[name="draftMode"]:checked')?.value || 'snake';
+        appState.maxPicksPerPlayer = parseInt(document.getElementById('select-max-picks').value) || 0;
+        appState.picksPerTurn = parseInt(document.getElementById('select-picks-per-turn').value) || 1;
+        appState.turnTimerSeconds = parseInt(document.getElementById('select-turn-timer').value) || 0;
 
         // Fetch Scryfall Data
         const scryfallMap = await fetchScryfallBatch(parsedCardNames);
@@ -675,14 +724,20 @@
     function generateDraftOrder(totalCards, numPlayers) {
       appState.draftOrder = [];
       let round = 0;
+      const ppt = appState.picksPerTurn || 1;
+
       while (appState.draftOrder.length < totalCards) {
         if (appState.draftMode === 'snake' && round % 2 === 1) {
           for (let p = numPlayers - 1; p >= 0; p--) {
-            if (appState.draftOrder.length < totalCards) appState.draftOrder.push(p);
+            for (let k = 0; k < ppt; k++) {
+              if (appState.draftOrder.length < totalCards) appState.draftOrder.push(p);
+            }
           }
         } else {
           for (let p = 0; p < numPlayers; p++) {
-            if (appState.draftOrder.length < totalCards) appState.draftOrder.push(p);
+            for (let k = 0; k < ppt; k++) {
+              if (appState.draftOrder.length < totalCards) appState.draftOrder.push(p);
+            }
           }
         }
         round++;
@@ -767,17 +822,22 @@
 
       updateIdentityUI();
       updateDraftUI();
+
+      // Automatically prompt identity selection if unclaimed
+      if (myPlayerId === null || myPlayerId === undefined) {
+        openIdentityModal();
+      }
     }
 
     window.copyRoomLink = function() {
-      const url = window.location.href;
+      const fullUrl = `${window.location.origin}${window.location.pathname}#room=${activeRoomId || ''}`;
       const dummy = document.createElement("textarea");
       document.body.appendChild(dummy);
-      dummy.value = url;
+      dummy.value = fullUrl;
       dummy.select();
       document.execCommand("copy");
       document.body.removeChild(dummy);
-      alert("Draft Room Link copied to clipboard! Share this URL with your draft group.");
+      alert("Draft Room Link copied to clipboard!\n\nShare this URL:\n" + fullUrl);
     };
 
     window.openIdentityModal = function() {
@@ -818,6 +878,41 @@
       }
     }
 
+    function resetTurnTimer() {
+      if (timerInterval) clearInterval(timerInterval);
+      const display = document.getElementById('turn-timer-display');
+      const secLabel = document.getElementById('timer-sec');
+
+      if (!appState.turnTimerSeconds || appState.currentPickIndex >= appState.draftOrder.length) {
+        display.classList.add('hidden');
+        return;
+      }
+
+      display.classList.remove('hidden');
+      currentTimerSeconds = appState.turnTimerSeconds;
+      secLabel.innerText = currentTimerSeconds;
+
+      timerInterval = setInterval(() => {
+        currentTimerSeconds--;
+        secLabel.innerText = currentTimerSeconds < 10 ? `0${currentTimerSeconds}` : currentTimerSeconds;
+
+        if (currentTimerSeconds <= 0) {
+          clearInterval(timerInterval);
+          autoPickFirstAvailableCard();
+        }
+      }, 1000);
+    }
+
+    function autoPickFirstAvailableCard() {
+      const activePlayerIndex = appState.draftOrder[appState.currentPickIndex];
+      if (myPlayerId !== null && parseInt(myPlayerId) !== activePlayerIndex) return;
+
+      const availableCard = appState.cardPool.find(c => c.draftedBy === null);
+      if (availableCard) {
+        executePick(availableCard.id);
+      }
+    }
+
     function saveStateToLocalStorage() {
       try {
         const serializedState = {
@@ -839,6 +934,12 @@
 
       if (myPlayerId !== null && parseInt(myPlayerId) !== activePlayerIndex) {
         alert(`It is currently ${activePlayer.name}'s turn to pick.`);
+        return;
+      }
+
+      // Check max pick limits if configured
+      if (appState.maxPicksPerPlayer > 0 && activePlayer.pool.length >= appState.maxPicksPerPlayer) {
+        alert(`${activePlayer.name} has reached the maximum allowed picks (${appState.maxPicksPerPlayer}).`);
         return;
       }
 
@@ -981,6 +1082,7 @@
       const drafted = appState.cardPool.filter(c => c.draftedBy !== null).length;
       document.getElementById('stat-cards-remaining').innerText = `${total - drafted} / ${total}`;
 
+      resetTurnTimer();
       renderDraftTrack();
       renderCardsPool();
       renderPlayerTabs();
