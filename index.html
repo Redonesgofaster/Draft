@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MTG Rotisserie Draft Simulator</title>
+  <title>MTG Rotisserie Draft - Multi-User Realtime</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -34,20 +34,10 @@
     }
   </script>
   <style>
-    ::-webkit-scrollbar {
-      width: 6px;
-      height: 6px;
-    }
-    ::-webkit-scrollbar-track {
-      background: #0b0d12;
-    }
-    ::-webkit-scrollbar-thumb {
-      background: #2d3345;
-      border-radius: 4px;
-    }
-    ::-webkit-scrollbar-thumb:hover {
-      background: #6366f1;
-    }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0b0d12; }
+    ::-webkit-scrollbar-thumb { background: #2d3345; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #6366f1; }
     
     .card-hover-effect {
       transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
@@ -79,6 +69,68 @@
     .mana-c { background-color: #ccc2c0; color: #222; }
     .mana-generic { background-color: #888280; color: #fff; }
   </style>
+
+  <!-- FIREBASE IMPORTS -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, doc, setDoc, getDoc, onSnapshot, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    // Setup Firebase Environment Variables
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-mtg-rotisserie';
+    const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+      apiKey: "demo-api-key",
+      authDomain: "demo-app.firebaseapp.com",
+      projectId: "demo-app",
+      storageBucket: "demo-app.appspot.com",
+      messagingSenderId: "123456789",
+      appId: "1:123456789:web:123456"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    // Make Firebase SDK globally available to main script scope
+    window.FB = {
+      appId,
+      auth,
+      db,
+      doc,
+      setDoc,
+      getDoc,
+      onSnapshot,
+      updateDoc,
+      currentUser: null,
+      isAuthReady: false
+    };
+
+    // Authenticate
+    async function initAuth() {
+      try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          const userCred = await signInWithCustomToken(auth, __initial_auth_token);
+          window.FB.currentUser = userCred.user;
+        } else {
+          const userCred = await signInAnonymously(auth);
+          window.FB.currentUser = userCred.user;
+        }
+      } catch (e) {
+        console.warn("Auth fallback to anonymous:", e);
+        try {
+          const userCred = await signInAnonymously(auth);
+          window.FB.currentUser = userCred.user;
+        } catch(err) {
+          console.error("Firebase auth failed:", err);
+        }
+      } finally {
+        window.FB.isAuthReady = true;
+        window.dispatchEvent(new Event('firebase-auth-ready'));
+      }
+    }
+
+    initAuth();
+  </script>
 </head>
 <body class="bg-mtg-darkBg text-slate-200 font-sans min-h-screen flex flex-col selection:bg-indigo-600 selection:text-white">
 
@@ -94,82 +146,46 @@
           </div>
           <div>
             <h1 class="font-cinzel text-lg font-bold tracking-wide text-white flex items-center gap-2">
-              Rotisserie Draft <span class="text-[10px] font-sans px-2 py-0.5 rounded-full bg-indigo-900/60 text-indigo-300 border border-indigo-700">MTG Cube</span>
+              Rotisserie Draft <span class="text-[10px] font-sans px-2 py-0.5 rounded-full bg-indigo-900/60 text-indigo-300 border border-indigo-700">Multiplayer</span>
             </h1>
-            <p class="text-[11px] text-slate-400">Open Visual Pool • Dynamic Scryfall API</p>
+            <p class="text-[11px] text-slate-400">Asynchronous Real-Time MTG Cube Draft</p>
           </div>
         </div>
 
-        <!-- Dynamic Header Info during Draft -->
-        <div id="header-draft-stats" class="hidden flex items-center gap-4 bg-mtg-panelBg px-4 py-1 rounded-xl border border-slate-700/60">
-          <div class="text-center">
-            <span class="text-[9px] uppercase font-semibold text-slate-400 block">Pick</span>
-            <span id="stat-pick-num" class="text-xs font-bold text-indigo-400">1 / 180</span>
-          </div>
-          <div class="h-5 w-px bg-slate-700"></div>
-          <div class="text-center">
-            <span class="text-[9px] uppercase font-semibold text-slate-400 block">Round</span>
-            <span id="stat-round-num" class="text-xs font-bold text-slate-200">1</span>
-          </div>
-          <div class="h-5 w-px bg-slate-700"></div>
-          <div class="text-center">
-            <span class="text-[9px] uppercase font-semibold text-slate-400 block">Remaining</span>
-            <span id="stat-remaining" class="text-xs font-bold text-emerald-400">0</span>
-          </div>
-        </div>
-
-        <!-- Action Controls -->
-        <div class="flex items-center space-x-2">
-          <!-- Persistence Status Badge -->
-          <span id="save-indicator" class="hidden text-[10px] bg-emerald-950/80 text-emerald-400 border border-emerald-800/80 px-2 py-1 rounded-lg flex items-center gap-1 font-mono">
-            <i class="fa-solid fa-floppy-disk"></i> Saved
-          </span>
-
-          <button id="btn-undo" onclick="undoLastPick()" class="hidden text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg border border-slate-700 flex items-center gap-1.5 transition">
-            <i class="fa-solid fa-rotate-left text-amber-400"></i> Undo Pick
+        <!-- Room Banner & Share Info -->
+        <div id="room-header-badge" class="hidden flex items-center gap-2 bg-slate-900 px-3 py-1.5 rounded-xl border border-indigo-900/60 text-xs">
+          <span class="text-slate-400 font-mono">Room:</span>
+          <span id="header-room-code" class="text-indigo-300 font-bold font-mono uppercase">---</span>
+          <button onclick="copyRoomLink()" class="ml-1 text-slate-400 hover:text-white px-2 py-0.5 bg-slate-800 rounded border border-slate-700 transition" title="Copy Shareable Draft Link">
+            <i class="fa-solid fa-link text-[10px]"></i> Share
           </button>
+          <span id="sync-status-indicator" class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800 flex items-center gap-1 font-mono">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Live Sync
+          </span>
+        </div>
+
+        <!-- Identity Selector & Header Controls -->
+        <div class="flex items-center space-x-2">
+          <!-- Identity Selector Dropdown -->
+          <div id="identity-box" class="hidden flex items-center gap-1.5 bg-slate-900 border border-slate-700/80 px-2.5 py-1 rounded-xl text-xs">
+            <span class="text-[10px] text-slate-400 font-semibold uppercase">You are:</span>
+            <select id="user-identity-select" onchange="claimIdentity(this.value)" class="bg-transparent text-indigo-300 font-bold focus:outline-none cursor-pointer">
+              <option value="-1">Spectator / Observer</option>
+            </select>
+          </div>
+
           <button id="btn-restart" onclick="confirmReset()" class="text-xs bg-slate-800 hover:bg-red-900/40 hover:text-red-300 text-slate-300 px-3 py-1.5 rounded-lg border border-slate-700 transition flex items-center gap-1.5">
-            <i class="fa-solid fa-power-off"></i> New Draft
+            <i class="fa-solid fa-plus"></i> New Room
           </button>
         </div>
       </div>
     </header>
 
-    <!-- RESUME SAVED DRAFT MODAL BANNER -->
-    <div id="resume-modal" class="hidden fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4">
-      <div class="bg-mtg-cardBg border border-indigo-500/60 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 text-center">
-        <div class="w-14 h-14 bg-indigo-950/80 rounded-full border border-indigo-500 text-indigo-400 flex items-center justify-center text-2xl mx-auto shadow-lg">
-          <i class="fa-solid fa-clock-rotate-left"></i>
-        </div>
-        <div>
-          <h3 class="text-xl font-cinzel font-bold text-white mb-1">Resume Saved Draft?</h3>
-          <p class="text-xs text-slate-400">An ongoing draft session was recovered from your local storage.</p>
-        </div>
-
-        <div id="resume-details-box" class="bg-slate-900/90 border border-slate-800 rounded-xl p-3.5 text-left text-xs space-y-1.5 font-mono">
-          <div class="flex justify-between text-slate-300">
-            <span>Saved Time:</span>
-            <span id="saved-draft-time" class="text-indigo-300">--</span>
-          </div>
-          <div class="flex justify-between text-slate-300">
-            <span>Progress:</span>
-            <span id="saved-draft-progress" class="text-emerald-400 font-bold">Pick 0 / 0</span>
-          </div>
-          <div class="flex justify-between text-slate-300">
-            <span>Players:</span>
-            <span id="saved-draft-players" class="text-slate-200">0 Players</span>
-          </div>
-        </div>
-
-        <div class="flex flex-col sm:flex-row gap-2.5 pt-2">
-          <button onclick="discardSavedDraftAndSetup()" class="flex-1 py-2.5 bg-slate-800 hover:bg-red-900/40 text-slate-300 hover:text-red-300 text-xs font-bold rounded-xl border border-slate-700 transition">
-            Discard & New Draft
-          </button>
-          <button onclick="resumeSavedDraft()" class="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg transition flex items-center justify-center gap-1.5">
-            <i class="fa-solid fa-play"></i> Resume Draft
-          </button>
-        </div>
-      </div>
+    <!-- INITIALIZATION SPINNER FOR ROOM LOADING -->
+    <div id="room-loading-screen" class="hidden flex-1 flex flex-col items-center justify-center p-6 text-center">
+      <div class="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+      <h3 class="text-lg font-cinzel font-bold text-white mb-1">Joining Draft Room...</h3>
+      <p class="text-xs text-slate-400">Fetching synced draft state from Firebase.</p>
     </div>
 
     <!-- SCREEN 1: SETUP SCREEN -->
@@ -177,15 +193,21 @@
       <div class="bg-mtg-cardBg border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-2xl space-y-6">
         <div>
           <h2 class="text-2xl font-cinzel font-bold text-white mb-1 flex items-center gap-2">
-            <i class="fa-solid fa-sliders text-indigo-500"></i> Configure Rotisserie Draft
+            <i class="fa-solid fa-sliders text-indigo-500"></i> Create Rotisserie Draft Room
           </h2>
-          <p class="text-xs text-slate-400">Set up your players and upload your cube card list or CubeCobra CSV file.</p>
+          <p class="text-xs text-slate-400">Set up room code, player list, and upload your cube card list or CubeCobra CSV file.</p>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
           
           <!-- Players Settings -->
           <div class="space-y-4">
+            <div>
+              <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1">Room Code / ID</label>
+              <input type="text" id="input-room-code" placeholder="e.g. CUBE123" 
+                     class="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-indigo-300 font-mono font-bold focus:outline-none focus:border-indigo-500 uppercase">
+            </div>
+
             <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300">
               1. Players Count (<span id="player-count-label" class="text-indigo-400 font-bold">4</span>)
             </label>
@@ -193,13 +215,13 @@
                    oninput="updatePlayerInputs(this.value)"
                    class="w-full accent-indigo-500 cursor-pointer">
             
-            <div id="player-names-container" class="space-y-2 max-h-48 overflow-y-auto pr-1">
+            <div id="player-names-container" class="space-y-2 max-h-40 overflow-y-auto pr-1">
               <!-- Player inputs generated dynamically -->
             </div>
 
             <!-- Draft Format Toggle -->
             <div class="pt-2">
-              <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-2">Draft Picking Order</label>
+              <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-2">Draft Order Format</label>
               <div class="grid grid-cols-2 gap-2">
                 <button type="button" id="mode-snake" onclick="setDraftMode('snake')" 
                         class="p-2.5 text-xs font-semibold rounded-xl border border-indigo-600 bg-indigo-900/40 text-indigo-200 flex flex-col items-center gap-1 transition">
@@ -233,26 +255,26 @@
                 Upload CSV file (CubeCobra supported)
               </label>
               <input type="file" id="csv-file-input" accept=".csv,.txt" onchange="handleFileUpload(event)" class="hidden">
-              <span class="text-[10px] text-slate-500">Supports CubeCobra CSVs, single-column lists, or quantity prefixes</span>
+              <span class="text-[10px] text-slate-500">Supports CubeCobra CSVs or plain text card lists</span>
             </div>
 
             <div class="relative flex-1">
-              <textarea id="input-card-pool" rows="6" 
-                        placeholder="Or paste card list here (one card per line, e.g. 'Black Lotus' or '1 Lightning Bolt')..." 
+              <textarea id="input-card-pool" rows="5" 
+                        placeholder="Or paste card list here (one card per line)..." 
                         class="w-full h-full bg-slate-900 border border-slate-700/80 rounded-xl p-3 text-xs text-slate-200 font-mono focus:outline-none focus:border-indigo-500 transition resize-none"></textarea>
             </div>
             
             <div class="flex justify-between items-center text-[11px] text-slate-400">
               <span id="card-count-badge" class="font-medium text-slate-300">Cards detected: 0</span>
-              <span class="text-indigo-400"><i class="fa-solid fa-bolt text-[10px]"></i> Scryfall POST Batch</span>
+              <span class="text-indigo-400"><i class="fa-solid fa-bolt text-[10px]"></i> Scryfall API Enabled</span>
             </div>
           </div>
         </div>
 
         <!-- Submit Button -->
         <div class="pt-4 border-t border-slate-800 flex justify-end">
-          <button id="btn-start-draft" onclick="startDraft()" class="w-full sm:w-auto px-8 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-sm rounded-xl shadow-lg transition transform active:scale-95 flex items-center justify-center gap-2">
-            <i class="fa-solid fa-play"></i> Fetch Cards & Start Draft
+          <button id="btn-start-draft" onclick="createNewDraftRoom()" class="w-full sm:w-auto px-8 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-sm rounded-xl shadow-lg transition transform active:scale-95 flex items-center justify-center gap-2">
+            <i class="fa-solid fa-cloud-arrow-up"></i> Create Synced Room & Start Draft
           </button>
         </div>
       </div>
@@ -261,26 +283,50 @@
     <!-- LOADING OVERLAY FOR SCRYFALL BATCH FETCH -->
     <div id="loading-overlay" class="hidden fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center">
       <div class="w-16 h-16 rounded-full border-4 border-indigo-500 border-t-transparent animate-spin mb-4"></div>
-      <h3 class="text-xl font-cinzel font-bold text-white mb-1">Fetching Magic Card Pool...</h3>
+      <h3 class="text-xl font-cinzel font-bold text-white mb-1">Fetching Scryfall Card Pool...</h3>
       <p id="loading-progress-text" class="text-xs text-indigo-300 font-mono">Querying Scryfall Collection API...</p>
       <div class="w-64 bg-slate-800 h-2 rounded-full mt-4 overflow-hidden border border-slate-700">
-        <div id="loading-bar fill" class="bg-indigo-500 h-full w-0 transition-all duration-200" style="width: 0%;"></div>
+        <div id="loading-bar-fill" class="bg-indigo-500 h-full w-0 transition-all duration-200" style="width: 0%;"></div>
       </div>
     </div>
 
     <!-- SCREEN 2: ACTIVE DRAFT SCREEN -->
     <section id="screen-draft" class="hidden flex-1 flex flex-col">
       
-      <!-- TURN BANNER -->
+      <!-- TURN BANNER & TURN STATUS -->
       <div id="turn-banner" class="bg-gradient-to-r from-indigo-950/90 via-purple-950/80 to-slate-950 border-b border-indigo-800/40 px-4 py-2.5 shadow-inner">
         <div class="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-2">
+          
           <div class="flex items-center gap-3">
             <div id="active-player-avatar" class="w-9 h-9 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-sm shadow-md border-2 border-indigo-300">
               P1
             </div>
             <div>
-              <span class="text-[10px] uppercase tracking-wider text-indigo-300 font-semibold">Active Pick Turn</span>
+              <div class="flex items-center gap-2">
+                <span class="text-[10px] uppercase tracking-wider text-indigo-300 font-semibold">Active Pick Turn</span>
+                <span id="turn-lock-badge" class="text-[9px] px-2 py-0.2 rounded font-bold uppercase bg-amber-950 text-amber-300 border border-amber-800">
+                  Waiting...
+                </span>
+              </div>
               <h2 id="active-player-name" class="text-base font-bold text-white leading-none">Player 1</h2>
+            </div>
+          </div>
+
+          <!-- Stats Pill -->
+          <div id="header-draft-stats" class="flex items-center gap-4 bg-mtg-panelBg px-4 py-1 rounded-xl border border-slate-700/60 text-xs">
+            <div class="text-center">
+              <span class="text-[9px] uppercase font-semibold text-slate-400 block">Pick</span>
+              <span id="stat-pick-num" class="text-xs font-bold text-indigo-400">1 / 180</span>
+            </div>
+            <div class="h-5 w-px bg-slate-700"></div>
+            <div class="text-center">
+              <span class="text-[9px] uppercase font-semibold text-slate-400 block">Round</span>
+              <span id="stat-round-num" class="text-xs font-bold text-slate-200">1</span>
+            </div>
+            <div class="h-5 w-px bg-slate-700"></div>
+            <div class="text-center">
+              <span class="text-[9px] uppercase font-semibold text-slate-400 block">Remaining</span>
+              <span id="stat-remaining" class="text-xs font-bold text-emerald-400">0</span>
             </div>
           </div>
 
@@ -338,7 +384,7 @@
 
           <!-- CARDS CONTAINER GRID -->
           <div id="cards-container" class="flex-1 min-h-[420px]">
-            <!-- Cards rendered here dynamically -->
+            <!-- Cards rendered dynamically -->
           </div>
         </div>
 
@@ -357,7 +403,7 @@
               </div>
             </div>
 
-            <!-- Group By Selector & Stats -->
+            <!-- Group By Selector -->
             <div class="flex justify-between items-center mb-2 text-[11px] text-slate-400 bg-slate-900/60 p-1.5 rounded-lg border border-slate-800">
               <span>Group by:</span>
               <div class="space-x-1">
@@ -392,10 +438,10 @@
           <!-- Draft Action History Log -->
           <div class="bg-mtg-cardBg border border-slate-800 rounded-xl p-3 h-40 flex flex-col shadow-md">
             <h3 class="font-cinzel font-bold text-xs text-slate-300 mb-1.5 flex items-center gap-1.5">
-              <i class="fa-solid fa-history text-slate-400"></i> Draft Log
+              <i class="fa-solid fa-history text-slate-400"></i> Synced Draft Log
             </h3>
             <div id="draft-log" class="flex-1 overflow-y-auto space-y-1 text-xs text-slate-400 pr-1 font-mono">
-              <div class="text-slate-500 italic text-[10px]">Draft event history will appear here...</div>
+              <div class="text-slate-500 italic text-[10px]">Realtime event log...</div>
             </div>
           </div>
 
@@ -411,11 +457,11 @@
           <i class="fa-solid fa-trophy"></i>
         </div>
         <h2 class="text-2xl font-cinzel font-bold text-white">Draft Complete!</h2>
-        <p class="text-slate-400 text-xs max-w-lg mx-auto">Review each player's drafted pool below and export the decklists for MTGO or tabletop play.</p>
+        <p class="text-slate-400 text-xs max-w-lg mx-auto">All cards have been picked! Review each player's drafted pool below and export decklists.</p>
         
         <div class="pt-2 flex justify-center gap-2">
           <button onclick="exportAllJSON()" class="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs font-semibold rounded-lg border border-slate-700 text-slate-200 transition">
-            <i class="fa-solid fa-download"></i> Export JSON
+            <i class="fa-solid fa-download"></i> Export Draft JSON
           </button>
         </div>
       </div>
@@ -459,7 +505,7 @@
           </div>
 
           <div id="modal-pick-section" class="pt-2 border-t border-slate-800">
-            <span class="text-slate-400 text-[10px] block mb-1">Pick for player:</span>
+            <span class="text-slate-400 text-[10px] block mb-1">Active Pick Player:</span>
             <div id="modal-player-target" class="font-bold text-indigo-300 text-xs bg-indigo-950/60 p-2 rounded-lg border border-indigo-800/60 text-center">
               Player 1
             </div>
@@ -472,7 +518,7 @@
           Close
         </button>
         <button id="modal-btn-confirm" class="flex-1 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg transition">
-          Confirm Draft Pick
+          Confirm Pick
         </button>
       </div>
     </div>
@@ -498,10 +544,13 @@
       ]
     };
 
-    const LOCAL_STORAGE_KEY = 'mtg_rotisserie_draft_save_v1';
+    // GLOBAL DRAFT STATE
+    let currentRoomId = null;
+    let myPlayerIndex = -1; // -1 = Spectator / Observer
+    let unsubscribeFirestore = null;
 
-    // STATE MANAGEMENT
     let appState = {
+      roomId: '',
       players: [],
       cardPool: [],
       draftOrder: [],
@@ -513,201 +562,215 @@
       filterSearch: '',
       filterType: '',
       viewMode: 'grid',
-      poolDisplayMode: 'list', // 'list' or 'grid'
-      poolGrouping: 'type', // 'type' or 'cmc'
-      timestamp: null
+      poolDisplayMode: 'list',
+      poolGrouping: 'type'
     };
 
     let pendingPickCardId = null;
 
-    // INITIALIZATION & LOCAL STORAGE RESTORATION
-    window.onload = function() {
+    // INIT PAGE & ROUTING
+    window.addEventListener('load', () => {
       updatePlayerInputs(4);
       loadPreset('classic');
-      checkForSavedDraft();
-    };
-
-    function saveStateToLocalStorage() {
-      try {
-        appState.timestamp = new Date().toLocaleString();
-        // Convert Set to Array for JSON serialization
-        const serializedState = {
-          ...appState,
-          activeColorFilters: Array.from(appState.activeColorFilters)
-        };
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(serializedState));
-
-        // Show brief save indicator
-        const indicator = document.getElementById('save-indicator');
-        if (indicator && !document.getElementById('screen-draft').classList.contains('hidden')) {
-          indicator.classList.remove('hidden');
-        }
-      } catch (err) {
-        console.warn("Could not save draft state to localStorage:", err);
-      }
-    }
-
-    function checkForSavedDraft() {
-      try {
-        const savedRaw = localStorage.getItem(LOCAL_STORAGE_KEY);
-        if (!savedRaw) return;
-
-        const saved = JSON.parse(savedRaw);
-        if (saved && saved.cardPool && saved.cardPool.length > 0) {
-          document.getElementById('saved-draft-time').innerText = saved.timestamp || 'Recent Session';
-          document.getElementById('saved-draft-progress').innerText = `Pick ${saved.currentPickIndex + 1} / ${saved.draftOrder ? saved.draftOrder.length : saved.cardPool.length}`;
-          document.getElementById('saved-draft-players').innerText = `${saved.players ? saved.players.length : 0} (${saved.players.map(p => p.name).join(', ')})`;
-          
-          document.getElementById('resume-modal').classList.remove('hidden');
-        }
-      } catch (err) {
-        console.warn("Failed to read saved draft state:", err);
-      }
-    }
-
-    function resumeSavedDraft() {
-      try {
-        const savedRaw = localStorage.getItem(LOCAL_STORAGE_KEY);
-        if (!savedRaw) return;
-
-        const saved = JSON.parse(savedRaw);
-        appState = {
-          ...saved,
-          activeColorFilters: new Set(saved.activeColorFilters || [])
-        };
-
-        document.getElementById('resume-modal').classList.add('hidden');
-        document.getElementById('screen-setup').classList.add('hidden');
-
-        if (appState.currentPickIndex >= appState.draftOrder.length) {
-          finishDraft();
-        } else {
-          document.getElementById('screen-draft').classList.remove('hidden');
-          document.getElementById('header-draft-stats').classList.remove('hidden');
-          document.getElementById('btn-undo').classList.remove('hidden');
-          document.getElementById('save-indicator').classList.remove('hidden');
-          updateDraftUI();
-        }
-      } catch (err) {
-        alert("Failed to restore saved draft session.");
-        discardSavedDraftAndSetup();
-      }
-    }
-
-    function discardSavedDraftAndSetup() {
-      localStorage.removeItem(LOCAL_STORAGE_KEY);
-      document.getElementById('resume-modal').classList.add('hidden');
-      document.getElementById('save-indicator').classList.add('hidden');
-    }
-
-    function updatePlayerInputs(count) {
-      document.getElementById('player-count-label').innerText = count;
-      const container = document.getElementById('player-names-container');
-      const currentNames = Array.from(container.querySelectorAll('input')).map(i => i.value);
-      container.innerHTML = '';
-
-      for (let i = 0; i < count; i++) {
-        const defaultName = currentNames[i] || `Player ${i + 1}`;
-        const div = document.createElement('div');
-        div.className = 'flex items-center space-x-2';
-        div.innerHTML = `
-          <span class="text-xs text-slate-500 font-mono w-5 text-right">${i + 1}.</span>
-          <input type="text" value="${defaultName}" placeholder="Player ${i + 1} Name"
-                 class="player-name-input flex-1 bg-slate-900 border border-slate-700/70 rounded-lg px-3 py-1 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
-        `;
-        container.appendChild(div);
-      }
-    }
-
-    function setDraftMode(mode) {
-      appState.draftMode = mode;
-      document.getElementById('mode-snake').className = mode === 'snake'
-        ? "p-2.5 text-xs font-semibold rounded-xl border border-indigo-600 bg-indigo-900/40 text-indigo-200 flex flex-col items-center gap-1 transition"
-        : "p-2.5 text-xs font-semibold rounded-xl border border-slate-700 bg-slate-800 text-slate-400 flex flex-col items-center gap-1 transition";
       
-      document.getElementById('mode-straight').className = mode === 'straight'
-        ? "p-2.5 text-xs font-semibold rounded-xl border border-indigo-600 bg-indigo-900/40 text-indigo-200 flex flex-col items-center gap-1 transition"
-        : "p-2.5 text-xs font-semibold rounded-xl border border-slate-700 bg-slate-800 text-slate-400 flex flex-col items-center gap-1 transition";
-    }
+      // Random default room ID generator
+      document.getElementById('input-room-code').value = 'CUBE-' + Math.floor(1000 + Math.random() * 9000);
 
-    function loadPreset(key) {
-      if (CUBE_PRESETS[key]) {
-        document.getElementById('input-card-pool').value = CUBE_PRESETS[key].join('\n');
-        updateCardCount();
+      // Check URL for room code hash (e.g., #room=CUBE123 or ?room=CUBE123)
+      const urlParams = new URLSearchParams(window.location.search);
+      let roomFromUrl = urlParams.get('room');
+      
+      if (!roomFromUrl && window.location.hash.includes('room=')) {
+        const hashParams = new URLSearchParams(window.location.hash.replace('#', '?'));
+        roomFromUrl = hashParams.get('room');
       }
-    }
 
-    document.getElementById('input-card-pool').addEventListener('input', updateCardCount);
-
-    function updateCardCount() {
-      const text = document.getElementById('input-card-pool').value;
-      const parsed = parseCardList(text);
-      document.getElementById('card-count-badge').innerText = `Cards detected: ${parsed.length}`;
-    }
-
-    // CSV FILE HANDLER
-    function handleFileUpload(event) {
-      const file = event.target.files[0];
-      if (!file) return;
-
-      const reader = new FileReader();
-      reader.onload = function(e) {
-        const text = e.target.result;
-        document.getElementById('input-card-pool').value = text;
-        updateCardCount();
-      };
-      reader.readAsText(file);
-    }
-
-    // ROBUST CARD LIST / CSV PARSER
-    function parseCardList(rawText) {
-      if (!rawText.trim()) return [];
-
-      const lines = rawText.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
-      const cardList = [];
-
-      // Check if text has CSV headers (e.g. CubeCobra export: Name,Set,Collector Number...)
-      const firstLineLower = lines[0].toLowerCase();
-      const isCSV = firstLineLower.includes(',') && (firstLineLower.includes('name') || firstLineLower.includes('card'));
-
-      if (isCSV) {
-        const headers = lines[0].split(',').map(h => h.trim().replace(/^["']|["']$/g, '').toLowerCase());
-        const nameIdx = headers.findIndex(h => h === 'name' || h === 'card' || h === 'card name');
-
-        for (let i = 1; i < lines.length; i++) {
-          const cols = parseCSVRow(lines[i]);
-          if (cols.length > nameIdx && nameIdx !== -1) {
-            const cardName = cols[nameIdx].trim().replace(/^["']|["']$/g, '');
-            if (cardName && cardName.toLowerCase() !== 'name') {
-              cardList.push(cardName);
-            }
-          }
+      if (roomFromUrl) {
+        currentRoomId = roomFromUrl.toUpperCase();
+        // Wait for Firebase auth to initialize
+        if (window.FB && window.FB.isAuthReady) {
+          joinExistingRoom(currentRoomId);
+        } else {
+          window.addEventListener('firebase-auth-ready', () => joinExistingRoom(currentRoomId));
         }
-      } else {
-        // Line by line parser (handles optional quantity e.g. "1 Black Lotus" or "4x Lightning Bolt")
-        lines.forEach(line => {
-          // Match optional count like "1 ", "1x ", "1 - "
-          const match = line.match(/^(?:\d+x?\s*[-]?\s*)?(.+)$/i);
-          if (match && match[1]) {
-            const cleanName = match[1].trim();
-            if (cleanName) cardList.push(cleanName);
-          }
-        });
       }
+    });
 
-      return cardList;
+    // FIREBASE FIRESTORE SYNC & PATHS
+    function getDraftDocRef(roomId) {
+      const appId = window.FB.appId;
+      // Rule 1 Compliant Path: /artifacts/{appId}/public/data/drafts/{roomId}
+      return window.FB.doc(window.FB.db, 'artifacts', appId, 'public', 'data', 'drafts', roomId.toUpperCase());
     }
 
-    function parseCSVRow(rowText) {
-      const pattern = /(?!\s*$)\s*(?:'([^'\\]*(?:\\[\s\S][^'\\]*)*)'|"([^"\\]*(?:\\[\s\S][^"\\]*)*)"|([^,\s"]*))\s*(?:,|$)/g;
-      const result = [];
-      let match;
-      while ((match = pattern.exec(rowText)) !== null) {
-        if (match.index === pattern.lastIndex) pattern.lastIndex++;
-        const val = match[1] || match[2] || match[3] || '';
-        result.push(val);
+    async function createNewDraftRoom() {
+      const roomCodeInput = document.getElementById('input-room-code').value.trim();
+      const roomId = (roomCodeInput || 'CUBE-' + Math.floor(1000 + Math.random() * 9000)).toUpperCase();
+
+      const nameInputs = document.querySelectorAll('.player-name-input');
+      const playerNames = Array.from(nameInputs).map((input, idx) => input.value.trim() || `Player ${idx + 1}`);
+
+      const rawCardText = document.getElementById('input-card-pool').value;
+      const parsedCardNames = parseCardList(rawCardText);
+
+      if (parsedCardNames.length < playerNames.length) {
+        alert(`Please enter at least ${playerNames.length} valid cards to draft.`);
+        return;
       }
-      return result;
+
+      // Fetch Scryfall Data
+      const scryfallMap = await fetchScryfallBatch(parsedCardNames);
+
+      const players = playerNames.map((name, index) => ({
+        id: index,
+        name: name,
+        pool: []
+      }));
+
+      const cardPool = parsedCardNames.map((name, index) => {
+        const scryData = scryfallMap[name.toLowerCase()] || {};
+        return {
+          id: `card-${index}`,
+          name: scryData.name || name,
+          colors: scryData.colors || [],
+          color_identity: scryData.color_identity || [],
+          cmc: scryData.cmc !== undefined ? scryData.cmc : 0,
+          type: scryData.type || 'Unknown',
+          mana_cost: scryData.mana_cost || '',
+          image_url: scryData.image_url || null,
+          oracle_text: scryData.oracle_text || '',
+          draftedBy: null
+        };
+      });
+
+      const draftOrder = generateDraftOrderArray(cardPool.length, playerNames.length, appState.draftMode);
+
+      const draftData = {
+        roomId: roomId,
+        players: players,
+        cardPool: cardPool,
+        draftOrder: draftOrder,
+        currentPickIndex: 0,
+        draftMode: appState.draftMode,
+        history: [],
+        createdAt: new Date().toISOString()
+      };
+
+      try {
+        const docRef = getDraftDocRef(roomId);
+        await window.FB.setDoc(docRef, draftData);
+
+        // Update URL Hash without reload
+        window.location.hash = `room=${roomId}`;
+        currentRoomId = roomId;
+
+        joinExistingRoom(roomId);
+      } catch (err) {
+        console.error("Error creating draft room:", err);
+        alert("Failed to create draft room in database: " + err.message);
+      }
+    }
+
+    async function joinExistingRoom(roomId) {
+      document.getElementById('screen-setup').classList.add('hidden');
+      document.getElementById('room-loading-screen').classList.remove('hidden');
+
+      const docRef = getDraftDocRef(roomId);
+
+      try {
+        const docSnap = await window.FB.getDoc(docRef);
+        if (!docSnap.exists()) {
+          alert(`Draft room "${roomId}" was not found! Please check room code.`);
+          document.getElementById('room-loading-screen').classList.add('hidden');
+          document.getElementById('screen-setup').classList.remove('hidden');
+          return;
+        }
+
+        // Setup Realtime Listener
+        if (unsubscribeFirestore) unsubscribeFirestore();
+
+        unsubscribeFirestore = window.FB.onSnapshot(docRef, (snapshot) => {
+          if (snapshot.exists()) {
+            const data = snapshot.data();
+            syncDraftStateFromFirebase(data);
+          }
+        }, (err) => {
+          console.error("Realtime listener error:", err);
+        });
+
+      } catch (err) {
+        console.error("Error joining room:", err);
+        alert("Failed to join room: " + err.message);
+      }
+    }
+
+    function syncDraftStateFromFirebase(data) {
+      currentRoomId = data.roomId;
+      
+      appState.roomId = data.roomId;
+      appState.players = data.players || [];
+      appState.cardPool = data.cardPool || [];
+      appState.draftOrder = data.draftOrder || [];
+      appState.currentPickIndex = data.currentPickIndex || 0;
+      appState.draftMode = data.draftMode || 'snake';
+      appState.history = data.history || [];
+
+      // Re-populate individual player pools from cardPool
+      appState.players.forEach(p => p.pool = []);
+      appState.cardPool.forEach(card => {
+        if (card.draftedBy !== null && card.draftedBy !== undefined) {
+          const player = appState.players[card.draftedBy];
+          if (player) player.pool.push(card);
+        }
+      });
+
+      // Update Header Badges
+      document.getElementById('room-header-badge').classList.remove('hidden');
+      document.getElementById('header-room-code').innerText = data.roomId;
+      document.getElementById('identity-box').classList.remove('hidden');
+
+      updateIdentitySelectOptions();
+
+      document.getElementById('room-loading-screen').classList.add('hidden');
+
+      if (appState.currentPickIndex >= appState.draftOrder.length) {
+        finishDraft();
+      } else {
+        document.getElementById('screen-draft').classList.remove('hidden');
+        updateDraftUI();
+      }
+    }
+
+    // IDENTITY & TURN LOCKING
+    function updateIdentitySelectOptions() {
+      const select = document.getElementById('user-identity-select');
+      const savedIdent = sessionStorage.getItem(`mtg_rotisserie_ident_${currentRoomId}`);
+      
+      select.innerHTML = '<option value="-1">Spectator / Observer</option>';
+      appState.players.forEach((p, idx) => {
+        select.innerHTML += `<option value="${idx}">${p.name}</option>`;
+      });
+
+      if (savedIdent !== null && savedIdent !== undefined) {
+        select.value = savedIdent;
+        myPlayerIndex = parseInt(savedIdent);
+      } else {
+        select.value = myPlayerIndex;
+      }
+    }
+
+    function claimIdentity(playerIdx) {
+      myPlayerIndex = parseInt(playerIdx);
+      if (currentRoomId) {
+        sessionStorage.setItem(`mtg_rotisserie_ident_${currentRoomId}`, myPlayerIndex);
+      }
+      updateDraftUI();
+    }
+
+    function isMyTurn() {
+      if (appState.currentPickIndex >= appState.draftOrder.length) return false;
+      const activePlayerIndex = appState.draftOrder[appState.currentPickIndex];
+      return myPlayerIndex === activePlayerIndex;
     }
 
     // SCRYFALL BATCH FETCHING (/cards/collection)
@@ -717,17 +780,18 @@
 
       const overlay = document.getElementById('loading-overlay');
       const progressText = document.getElementById('loading-progress-text');
+      const barFill = document.getElementById('loading-bar-fill');
       overlay.classList.remove('hidden');
 
-      // Batch in groups of 75 as required by Scryfall API
       const BATCH_SIZE = 75;
       for (let i = 0; i < uniqueNames.length; i += BATCH_SIZE) {
         const chunk = uniqueNames.slice(i, i + BATCH_SIZE);
+        const pct = Math.round((i / uniqueNames.length) * 100);
+        
         progressText.innerText = `Fetching Scryfall metadata: ${Math.min(i + BATCH_SIZE, uniqueNames.length)} / ${uniqueNames.length} cards...`;
+        if (barFill) barFill.style.width = `${pct}%`;
 
-        const body = {
-          identifiers: chunk.map(name => ({ name: name }))
-        };
+        const body = { identifiers: chunk.map(name => ({ name: name })) };
 
         try {
           const res = await fetch('https://api.scryfall.com/cards/collection', {
@@ -742,7 +806,6 @@
               data.data.forEach(scryCard => {
                 const parsed = processScryfallCard(scryCard);
                 cardMap[scryCard.name.toLowerCase()] = parsed;
-                // Also map search name requested
                 chunk.forEach(reqName => {
                   if (scryCard.name.toLowerCase().includes(reqName.toLowerCase())) {
                     cardMap[reqName.toLowerCase()] = parsed;
@@ -755,7 +818,7 @@
           console.warn('Scryfall batch fetch error:', err);
         }
 
-        await new Promise(r => setTimeout(r, 100)); // Respect API limits
+        await new Promise(r => setTimeout(r, 80));
       }
 
       overlay.classList.add('hidden');
@@ -763,7 +826,6 @@
     }
 
     function processScryfallCard(scry) {
-      // Handle transform / double-faced cards
       let img = null;
       if (scry.image_uris && scry.image_uris.normal) {
         img = scry.image_uris.normal;
@@ -793,82 +855,25 @@
       };
     }
 
-    // START DRAFT
-    async function startDraft() {
-      const nameInputs = document.querySelectorAll('.player-name-input');
-      const playerNames = Array.from(nameInputs).map((input, idx) => input.value.trim() || `Player ${idx + 1}`);
-
-      const rawCardText = document.getElementById('input-card-pool').value;
-      const parsedCardNames = parseCardList(rawCardText);
-
-      if (parsedCardNames.length < playerNames.length) {
-        alert(`Please enter at least ${playerNames.length} valid cards to draft.`);
-        return;
-      }
-
-      // Fetch official Scryfall data via POST batch
-      const scryfallMap = await fetchScryfallBatch(parsedCardNames);
-
-      // Create Players State
-      appState.players = playerNames.map((name, index) => ({
-        id: index,
-        name: name,
-        pool: []
-      }));
-
-      // Map pool cards to internal objects
-      appState.cardPool = parsedCardNames.map((name, index) => {
-        const scryData = scryfallMap[name.toLowerCase()] || {};
-        return {
-          id: `card-${index}-${Date.now()}`,
-          name: scryData.name || name,
-          colors: scryData.colors || [],
-          color_identity: scryData.color_identity || [],
-          cmc: scryData.cmc !== undefined ? scryData.cmc : 0,
-          type: scryData.type || 'Unknown',
-          mana_cost: scryData.mana_cost || '',
-          image_url: scryData.image_url || null,
-          oracle_text: scryData.oracle_text || '',
-          draftedBy: null
-        };
-      });
-
-      generateDraftOrder(appState.cardPool.length, playerNames.length);
-
-      appState.currentPickIndex = 0;
-      appState.history = [];
-      appState.selectedRosterPlayerIndex = 0;
-
-      saveStateToLocalStorage();
-
-      // Transition Screens
-      document.getElementById('screen-setup').classList.add('hidden');
-      document.getElementById('screen-draft').classList.remove('hidden');
-      document.getElementById('header-draft-stats').classList.remove('hidden');
-      document.getElementById('btn-undo').classList.remove('hidden');
-      document.getElementById('save-indicator').classList.remove('hidden');
-
-      updateDraftUI();
-    }
-
-    function generateDraftOrder(totalCards, numPlayers) {
-      appState.draftOrder = [];
+    function generateDraftOrderArray(totalCards, numPlayers, mode) {
+      const order = [];
       let round = 0;
-      while (appState.draftOrder.length < totalCards) {
-        if (appState.draftMode === 'snake' && round % 2 === 1) {
+      while (order.length < totalCards) {
+        if (mode === 'snake' && round % 2 === 1) {
           for (let p = numPlayers - 1; p >= 0; p--) {
-            if (appState.draftOrder.length < totalCards) appState.draftOrder.push(p);
+            if (order.length < totalCards) order.push(p);
           }
         } else {
           for (let p = 0; p < numPlayers; p++) {
-            if (appState.draftOrder.length < totalCards) appState.draftOrder.push(p);
+            if (order.length < totalCards) order.push(p);
           }
         }
         round++;
       }
+      return order;
     }
 
-    // UI UPDATES & RENDERING
+    // UI RENDERING
     function updateDraftUI() {
       const activePlayerIndex = appState.draftOrder[appState.currentPickIndex];
       const activePlayer = appState.players[activePlayerIndex];
@@ -876,7 +881,7 @@
       document.getElementById('stat-pick-num').innerText = `${appState.currentPickIndex + 1} / ${appState.draftOrder.length}`;
       document.getElementById('stat-round-num').innerText = Math.floor(appState.currentPickIndex / appState.players.length) + 1;
       
-      const undraftedCount = appState.cardPool.filter(c => c.draftedBy === null).length;
+      const undraftedCount = appState.cardPool.filter(c => c.draftedBy === null || c.draftedBy === undefined).length;
       document.getElementById('stat-remaining').innerText = undraftedCount;
 
       if (activePlayer) {
@@ -884,10 +889,22 @@
         document.getElementById('active-player-avatar').innerText = getInitials(activePlayer.name);
       }
 
+      // Turn Lock Badge Update
+      const badge = document.getElementById('turn-lock-badge');
+      if (isMyTurn()) {
+        badge.innerText = "YOUR TURN TO PICK";
+        badge.className = "text-[9px] px-2 py-0.5 rounded font-bold uppercase bg-emerald-950 text-emerald-300 border border-emerald-700 animate-pulse";
+      } else {
+        const name = activePlayer ? activePlayer.name : 'Player';
+        badge.innerText = `Waiting for ${name}`;
+        badge.className = "text-[9px] px-2 py-0.5 rounded font-bold uppercase bg-amber-950 text-amber-300 border border-amber-800";
+      }
+
       renderDraftOrderTrack();
       renderPlayerTabs();
       renderPlayerPoolContent();
       renderCardsGrid();
+      renderLogHistory();
     }
 
     function renderDraftOrderTrack() {
@@ -911,50 +928,27 @@
               ? 'bg-slate-800/60 text-slate-500 line-through' 
               : 'bg-slate-800 text-slate-300 border border-slate-700/50'
         }`;
-        chip.innerHTML = `<span class="text-[9px] opacity-70">#${i + 1}</span> ${player.name}`;
+        chip.innerHTML = `<span class="text-[9px] opacity-70">#${i + 1}</span> ${player ? player.name : 'P'}`;
         container.appendChild(chip);
       }
     }
 
-    function toggleColorFilter(color) {
-      const btn = document.querySelector(`button[data-color="${color}"]`);
-      if (appState.activeColorFilters.has(color)) {
-        appState.activeColorFilters.delete(color);
-        btn.classList.add('opacity-40');
-        btn.classList.remove('ring-2', 'ring-indigo-400', 'opacity-100');
-      } else {
-        appState.activeColorFilters.add(color);
-        btn.classList.remove('opacity-40');
-        btn.classList.add('ring-2', 'ring-indigo-400', 'opacity-100');
+    function renderLogHistory() {
+      const log = document.getElementById('draft-log');
+      log.innerHTML = '';
+
+      if (!appState.history || appState.history.length === 0) {
+        log.innerHTML = `<div class="text-slate-500 italic text-[10px]">No picks made yet...</div>`;
+        return;
       }
-      applyFilters();
-    }
 
-    function applyFilters() {
-      appState.filterSearch = document.getElementById('filter-search').value.toLowerCase();
-      appState.filterType = document.getElementById('filter-type').value;
-      renderCardsGrid();
-    }
-
-    function setViewMode(mode) {
-      appState.viewMode = mode;
-      document.getElementById('view-btn-grid').className = mode === 'grid' ? "px-2 py-1 text-xs bg-indigo-600 text-white" : "px-2 py-1 text-xs text-slate-400 hover:text-white";
-      document.getElementById('view-btn-table').className = mode === 'table' ? "px-2 py-1 text-xs bg-indigo-600 text-white" : "px-2 py-1 text-xs text-slate-400 hover:text-white";
-      renderCardsGrid();
-    }
-
-    function setPoolDisplayMode(mode) {
-      appState.poolDisplayMode = mode;
-      document.getElementById('pool-view-list').className = mode === 'list' ? "text-[10px] px-1.5 py-0.5 rounded bg-indigo-600 text-white" : "text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 hover:text-white";
-      document.getElementById('pool-view-grid').className = mode === 'grid' ? "text-[10px] px-1.5 py-0.5 rounded bg-indigo-600 text-white" : "text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 hover:text-white";
-      renderPlayerPoolContent();
-    }
-
-    function setPoolGrouping(grouping) {
-      appState.poolGrouping = grouping;
-      document.getElementById('group-btn-type').className = grouping === 'type' ? "text-indigo-400 font-bold underline" : "text-slate-400 hover:text-slate-200";
-      document.getElementById('group-btn-cmc').className = grouping === 'cmc' ? "text-indigo-400 font-bold underline" : "text-slate-400 hover:text-slate-200";
-      renderPlayerPoolContent();
+      // Render reverse order
+      [...appState.history].reverse().forEach(entry => {
+        const item = document.createElement('div');
+        item.className = 'text-[10px] py-0.5 border-b border-slate-800/40 text-slate-300';
+        item.innerHTML = `<span class="text-slate-500 font-mono text-[9px] mr-1">#${entry.pickNumber + 1}</span> <strong>${entry.playerName}</strong> picked <em>${entry.cardName}</em>`;
+        log.appendChild(item);
+      });
     }
 
     function renderCardsGrid() {
@@ -962,7 +956,7 @@
       container.innerHTML = '';
 
       const availableCards = appState.cardPool.filter(c => {
-        if (c.draftedBy !== null) return false;
+        if (c.draftedBy !== null && c.draftedBy !== undefined) return false;
         
         if (appState.filterSearch && !c.name.toLowerCase().includes(appState.filterSearch)) return false;
         if (appState.filterType && !c.type.toLowerCase().includes(appState.filterType.toLowerCase())) return false;
@@ -988,7 +982,7 @@
         container.innerHTML = `
           <div class="h-64 flex flex-col items-center justify-center text-slate-500 bg-mtg-cardBg border border-slate-800 rounded-2xl">
             <i class="fa-solid fa-ghost text-2xl mb-2"></i>
-            <p class="text-xs">No cards match the active filters or draft pool is empty.</p>
+            <p class="text-xs">No available cards match active filters or pool is drafted.</p>
           </div>
         `;
         return;
@@ -997,7 +991,6 @@
       if (appState.viewMode === 'grid') {
         const grid = document.createElement('div');
         grid.className = 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3';
-        
         availableCards.forEach(card => {
           grid.appendChild(createCardGridElement(card));
         });
@@ -1031,6 +1024,8 @@
       cardEl.className = 'bg-mtg-cardBg border border-slate-800 hover:border-indigo-500/80 rounded-xl overflow-hidden shadow-lg flex flex-col card-hover-effect cursor-pointer group relative';
       cardEl.onclick = () => openPickModal(card.id);
 
+      const canPick = isMyTurn();
+
       const imageHtml = card.image_url 
         ? `<img src="${card.image_url}" alt="${card.name}" class="w-full h-44 object-cover object-top transition duration-300 group-hover:scale-105" loading="lazy">`
         : `<div class="w-full h-44 bg-gradient-to-br from-slate-900 to-slate-800 flex flex-col items-center justify-center p-3 text-center border-b border-slate-800">
@@ -1050,8 +1045,8 @@
             <h4 class="font-bold text-xs text-white truncate group-hover:text-indigo-300 transition">${card.name}</h4>
             <p class="text-[10px] text-slate-400 truncate mt-0.5">${card.type}</p>
           </div>
-          <button class="mt-2 w-full py-1 bg-indigo-900/40 hover:bg-indigo-600 text-indigo-200 hover:text-white text-[10px] font-semibold rounded-lg border border-indigo-700/50 transition flex items-center justify-center gap-1">
-            <i class="fa-solid fa-plus text-[8px]"></i> Pick Card
+          <button class="mt-2 w-full py-1 ${canPick ? 'bg-indigo-600 hover:bg-indigo-500 text-white font-bold' : 'bg-slate-800 text-slate-400 font-normal'} text-[10px] rounded-lg border border-slate-700/50 transition flex items-center justify-center gap-1">
+            ${canPick ? '<i class="fa-solid fa-plus text-[8px]"></i> Pick Card' : '<i class="fa-solid fa-eye text-[8px]"></i> Inspect'}
           </button>
         </div>
       `;
@@ -1062,6 +1057,8 @@
       const tr = document.createElement('tr');
       tr.className = 'hover:bg-slate-800/40 transition cursor-pointer';
       tr.onclick = () => openPickModal(card.id);
+      const canPick = isMyTurn();
+
       tr.innerHTML = `
         <td class="p-2.5 font-semibold text-white flex items-center gap-2">
           ${card.name}
@@ -1069,34 +1066,125 @@
         <td class="p-2.5 text-slate-400">${card.type}</td>
         <td class="p-2.5 font-mono">${renderManaSymbols(card.mana_cost)}</td>
         <td class="p-2.5 text-right">
-          <button class="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-bold rounded shadow transition">
-            Pick
+          <button class="px-2.5 py-1 ${canPick ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400'} text-[10px] font-bold rounded shadow transition">
+            ${canPick ? 'Pick' : 'Inspect'}
           </button>
         </td>
       `;
       return tr;
     }
 
-    function renderManaSymbols(manaCost) {
-      if (!manaCost) return '';
-      const matches = manaCost.match(/\{([^}]+)\}/g);
-      if (!matches) return `<span class="text-[10px] text-slate-400">${manaCost}</span>`;
+    // REAL-TIME SYNCED PICK EXECUTION
+    async function executePick(cardId) {
+      if (!isMyTurn()) {
+        alert("It is not your turn to pick!");
+        return;
+      }
 
-      return matches.map(m => {
-        const symbol = m.replace(/[{}]/g, '').toUpperCase();
-        let bgClass = 'mana-generic';
-        if (symbol === 'W') bgClass = 'mana-w';
-        else if (symbol === 'U') bgClass = 'mana-u';
-        else if (symbol === 'B') bgClass = 'mana-b';
-        else if (symbol === 'R') bgClass = 'mana-r';
-        else if (symbol === 'G') bgClass = 'mana-g';
-        else if (symbol === 'C') bgClass = 'mana-c';
-        
-        return `<span class="mana-symbol ${bgClass}">${symbol}</span>`;
-      }).join('');
+      const card = appState.cardPool.find(c => c.id === cardId);
+      if (!card || card.draftedBy !== null) return;
+
+      const activePlayerIndex = appState.draftOrder[appState.currentPickIndex];
+      const activePlayer = appState.players[activePlayerIndex];
+
+      const nextPickIndex = appState.currentPickIndex + 1;
+      const updatedCardPool = appState.cardPool.map(c => {
+        if (c.id === cardId) {
+          return { ...c, draftedBy: activePlayerIndex };
+        }
+        return c;
+      });
+
+      const updatedHistory = [...(appState.history || []), {
+        pickNumber: appState.currentPickIndex,
+        cardId: card.id,
+        cardName: card.name,
+        playerIndex: activePlayerIndex,
+        playerName: activePlayer.name,
+        timestamp: new Date().toISOString()
+      }];
+
+      closePickModal();
+
+      // Write updated state to Firestore
+      try {
+        const docRef = getDraftDocRef(currentRoomId);
+        await window.FB.updateDoc(docRef, {
+          cardPool: updatedCardPool,
+          currentPickIndex: nextPickIndex,
+          history: updatedHistory
+        });
+      } catch (err) {
+        console.error("Failed to commit pick to database:", err);
+        alert("Failed to pick card: " + err.message);
+      }
     }
 
-    // PLAYER POOLS & ROSTER VIEW
+    // MODALS & INSPECTOR
+    function openPickModal(cardId) {
+      const card = appState.cardPool.find(c => c.id === cardId);
+      if (!card) return;
+
+      const activePlayerIndex = appState.draftOrder[appState.currentPickIndex];
+      const activePlayer = appState.players[activePlayerIndex];
+
+      pendingPickCardId = cardId;
+
+      document.getElementById('modal-card-name').innerText = card.name;
+      document.getElementById('modal-card-type').innerText = card.type || 'Unknown';
+      document.getElementById('modal-card-mana').innerHTML = renderManaSymbols(card.mana_cost) || '<span class="text-slate-500">None</span>';
+      document.getElementById('modal-card-text').innerText = card.oracle_text || 'No oracle text available.';
+
+      const img = document.getElementById('modal-card-img');
+      if (card.image_url) {
+        img.src = card.image_url;
+        img.classList.remove('hidden');
+      } else {
+        img.classList.add('hidden');
+      }
+
+      const pickBtn = document.getElementById('modal-btn-confirm');
+      const pickSection = document.getElementById('modal-pick-section');
+
+      const canPick = isMyTurn() && (card.draftedBy === null || card.draftedBy === undefined);
+
+      if (canPick) {
+        pickBtn.classList.remove('hidden');
+        pickSection.classList.remove('hidden');
+        document.getElementById('modal-player-target').innerText = `${activePlayer.name} (YOU)`;
+        pickBtn.onclick = () => executePick(cardId);
+      } else {
+        pickBtn.classList.add('hidden');
+        if (card.draftedBy !== null && card.draftedBy !== undefined) {
+          const owner = appState.players[card.draftedBy];
+          pickSection.classList.remove('hidden');
+          document.getElementById('modal-player-target').innerText = `Drafted by ${owner ? owner.name : 'Player'}`;
+        } else {
+          pickSection.classList.remove('hidden');
+          document.getElementById('modal-player-target').innerText = `Waiting for ${activePlayer ? activePlayer.name : 'Active Player'}`;
+        }
+      }
+
+      document.getElementById('pick-modal').classList.remove('hidden');
+    }
+
+    function closePickModal() {
+      document.getElementById('pick-modal').classList.add('hidden');
+      pendingPickCardId = null;
+    }
+
+    function copyRoomLink() {
+      const link = window.location.origin + window.location.pathname + `#room=${currentRoomId}`;
+      const dummy = document.createElement("textarea");
+      document.body.appendChild(dummy);
+      dummy.value = link;
+      dummy.select();
+      document.execCommand("copy");
+      document.body.removeChild(dummy);
+      alert(`Shareable draft room link copied to clipboard:\n${link}`);
+    }
+
+    // HELPER FUNCTIONS & RENDERING UTILS
     function renderPlayerTabs() {
       const container = document.getElementById('player-tabs');
       container.innerHTML = '';
@@ -1137,7 +1225,6 @@
         return;
       }
 
-      // Group Cards
       const grouped = {};
       player.pool.forEach(card => {
         let groupKey = 'Other';
@@ -1150,7 +1237,6 @@
           else if (card.type.includes('Enchantment')) groupKey = 'Enchantments';
           else if (card.type.includes('Land')) groupKey = 'Lands';
         } else {
-          // Group by CMC
           const cmcVal = Math.floor(card.cmc || 0);
           groupKey = cmcVal >= 6 ? '6+ Mana' : `${cmcVal} Mana`;
         }
@@ -1173,7 +1259,7 @@
           grouped[key].forEach(card => {
             const row = document.createElement('div');
             row.className = 'bg-slate-900/80 p-1.5 rounded border border-slate-800 flex justify-between items-center text-xs hover:border-slate-700 transition cursor-pointer';
-            row.onclick = () => openPickModal(card.id, true);
+            row.onclick = () => openPickModal(card.id);
             row.innerHTML = `
               <span class="font-medium text-slate-200 truncate">${card.name}</span>
               <span class="font-mono text-[9px] shrink-0 ml-1">${renderManaSymbols(card.mana_cost)}</span>
@@ -1181,13 +1267,12 @@
             section.appendChild(row);
           });
         } else {
-          // Grid Thumbnail View
           const miniGrid = document.createElement('div');
           miniGrid.className = 'grid grid-cols-3 gap-1.5 pt-1';
           grouped[key].forEach(card => {
             const miniCard = document.createElement('div');
             miniCard.className = 'bg-slate-900 border border-slate-800 rounded overflow-hidden cursor-pointer hover:border-indigo-500 transition relative';
-            miniCard.onclick = () => openPickModal(card.id, true);
+            miniCard.onclick = () => openPickModal(card.id);
             miniCard.innerHTML = card.image_url 
               ? `<img src="${card.image_url}" alt="${card.name}" class="w-full h-16 object-cover object-top">`
               : `<div class="p-1 text-[9px] font-bold text-center text-slate-300 truncate">${card.name}</div>`;
@@ -1236,119 +1321,28 @@
       });
     }
 
-    // PICKING & MODALS
-    function openPickModal(cardId, readOnly = false) {
-      const card = appState.cardPool.find(c => c.id === cardId);
-      if (!card) return;
+    function renderManaSymbols(manaCost) {
+      if (!manaCost) return '';
+      const matches = manaCost.match(/\{([^}]+)\}/g);
+      if (!matches) return `<span class="text-[10px] text-slate-400">${manaCost}</span>`;
 
-      const activePlayerIndex = appState.draftOrder[appState.currentPickIndex];
-      const activePlayer = appState.players[activePlayerIndex];
-
-      pendingPickCardId = cardId;
-
-      document.getElementById('modal-card-name').innerText = card.name;
-      document.getElementById('modal-card-type').innerText = card.type || 'Unknown';
-      document.getElementById('modal-card-mana').innerHTML = renderManaSymbols(card.mana_cost) || '<span class="text-slate-500">None</span>';
-      document.getElementById('modal-card-text').innerText = card.oracle_text || 'No oracle text available.';
-
-      const img = document.getElementById('modal-card-img');
-      if (card.image_url) {
-        img.src = card.image_url;
-        img.classList.remove('hidden');
-      } else {
-        img.classList.add('hidden');
-      }
-
-      const pickBtn = document.getElementById('modal-btn-confirm');
-      const pickSection = document.getElementById('modal-pick-section');
-
-      if (readOnly || card.draftedBy !== null) {
-        pickBtn.classList.add('hidden');
-        pickSection.classList.add('hidden');
-      } else {
-        pickBtn.classList.remove('hidden');
-        pickSection.classList.remove('hidden');
-        document.getElementById('modal-player-target').innerText = `${activePlayer.name}`;
-        pickBtn.onclick = () => executePick(cardId);
-      }
-
-      document.getElementById('pick-modal').classList.remove('hidden');
-    }
-
-    function closePickModal() {
-      document.getElementById('pick-modal').classList.add('hidden');
-      pendingPickCardId = null;
-    }
-
-    function executePick(cardId) {
-      const card = appState.cardPool.find(c => c.id === cardId);
-      if (!card || card.draftedBy !== null) return;
-
-      const activePlayerIndex = appState.draftOrder[appState.currentPickIndex];
-      const activePlayer = appState.players[activePlayerIndex];
-
-      card.draftedBy = activePlayerIndex;
-      activePlayer.pool.push(card);
-
-      appState.history.push({
-        pickIndex: appState.currentPickIndex,
-        cardId: card.id,
-        playerIndex: activePlayerIndex
-      });
-
-      addLogEntry(`${activePlayer.name} picked <strong>${card.name}</strong>`);
-      closePickModal();
-
-      appState.currentPickIndex++;
-
-      if (appState.currentPickIndex < appState.draftOrder.length) {
-        appState.selectedRosterPlayerIndex = appState.draftOrder[appState.currentPickIndex];
-      }
-
-      saveStateToLocalStorage();
-
-      if (appState.currentPickIndex >= appState.draftOrder.length) {
-        finishDraft();
-      } else {
-        updateDraftUI();
-      }
-    }
-
-    function undoLastPick() {
-      if (appState.history.length === 0) return;
-
-      const lastPick = appState.history.pop();
-      const card = appState.cardPool.find(c => c.id === lastPick.cardId);
-      const player = appState.players[lastPick.playerIndex];
-
-      if (card && player) {
-        card.draftedBy = null;
-        player.pool = player.pool.filter(c => c.id !== card.id);
-        appState.currentPickIndex = lastPick.pickIndex;
-
-        addLogEntry(`Undid pick: <em>${card.name}</em>`, true);
+      return matches.map(m => {
+        const symbol = m.replace(/[{}]/g, '').toUpperCase();
+        let bgClass = 'mana-generic';
+        if (symbol === 'W') bgClass = 'mana-w';
+        else if (symbol === 'U') bgClass = 'mana-u';
+        else if (symbol === 'B') bgClass = 'mana-b';
+        else if (symbol === 'R') bgClass = 'mana-r';
+        else if (symbol === 'G') bgClass = 'mana-g';
+        else if (symbol === 'C') bgClass = 'mana-c';
         
-        appState.selectedRosterPlayerIndex = appState.draftOrder[appState.currentPickIndex];
-        saveStateToLocalStorage();
-        updateDraftUI();
-      }
-    }
-
-    function addLogEntry(msg, isUndo = false) {
-      const log = document.getElementById('draft-log');
-      const entry = document.createElement('div');
-      entry.className = `text-[10px] py-0.5 border-b border-slate-800/40 ${isUndo ? 'text-amber-400' : 'text-slate-300'}`;
-      entry.innerHTML = `<span class="text-slate-500 font-mono text-[9px] mr-1">#${appState.currentPickIndex + 1}</span> ${msg}`;
-      log.prepend(entry);
+        return `<span class="mana-symbol ${bgClass}">${symbol}</span>`;
+      }).join('');
     }
 
     function finishDraft() {
       document.getElementById('screen-draft').classList.add('hidden');
-      document.getElementById('header-draft-stats').classList.add('hidden');
-      document.getElementById('btn-undo').classList.add('hidden');
       document.getElementById('screen-summary').classList.remove('hidden');
-
-      saveStateToLocalStorage();
       renderSummaryScreen();
     }
 
@@ -1359,7 +1353,6 @@
       appState.players.forEach(player => {
         const panel = document.createElement('div');
         panel.className = 'bg-mtg-cardBg border border-slate-800 rounded-xl p-4 flex flex-col justify-between shadow-lg space-y-3';
-        
         const textDecklist = player.pool.map(c => `1 ${c.name}`).join('\n');
 
         panel.innerHTML = `
@@ -1368,7 +1361,6 @@
               <h3 class="font-cinzel font-bold text-base text-indigo-300">${player.name}</h3>
               <span class="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full border border-slate-700">${player.pool.length} Cards</span>
             </div>
-            
             <div class="space-y-1 text-xs max-h-72 overflow-y-auto pr-1">
               ${player.pool.map(card => `
                 <div class="p-1.5 bg-slate-900/60 rounded border border-slate-800/80 flex justify-between items-center">
@@ -1378,7 +1370,6 @@
               `).join('')}
             </div>
           </div>
-
           <div class="pt-2 border-t border-slate-800 space-y-1.5">
             <button onclick="copyToClipboard(\`${textDecklist.replace(/`/g, '\\`')}\`)" class="w-full py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-lg transition flex items-center justify-center gap-1.5">
               <i class="fa-regular fa-copy"></i> Copy Text Decklist
@@ -1396,28 +1387,166 @@
       dummy.select();
       document.execCommand("copy");
       document.body.removeChild(dummy);
-      alert("Decklist copied to clipboard in MTGO/Arena format!");
+      alert("Decklist copied to clipboard!");
     }
 
     function exportAllJSON() {
       const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(appState, null, 2));
       const downloadAnchor = document.createElement('a');
       downloadAnchor.setAttribute("href", dataStr);
-      downloadAnchor.setAttribute("download", `rotisserie_draft_${Date.now()}.json`);
+      downloadAnchor.setAttribute("download", `rotisserie_draft_${currentRoomId}.json`);
       document.body.appendChild(downloadAnchor);
       downloadAnchor.click();
       downloadAnchor.remove();
     }
 
+    function parseCardList(rawText) {
+      if (!rawText.trim()) return [];
+      const lines = rawText.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+      const cardList = [];
+      const firstLineLower = lines[0].toLowerCase();
+      const isCSV = firstLineLower.includes(',') && (firstLineLower.includes('name') || firstLineLower.includes('card'));
+
+      if (isCSV) {
+        const headers = lines[0].split(',').map(h => h.trim().replace(/^["']|["']$/g, '').toLowerCase());
+        const nameIdx = headers.findIndex(h => h === 'name' || h === 'card' || h === 'card name');
+
+        for (let i = 1; i < lines.length; i++) {
+          const cols = parseCSVRow(lines[i]);
+          if (cols.length > nameIdx && nameIdx !== -1) {
+            const cardName = cols[nameIdx].trim().replace(/^["']|["']$/g, '');
+            if (cardName && cardName.toLowerCase() !== 'name') cardList.push(cardName);
+          }
+        }
+      } else {
+        lines.forEach(line => {
+          const match = line.match(/^(?:\d+x?\s*[-]?\s*)?(.+)$/i);
+          if (match && match[1]) {
+            const cleanName = match[1].trim();
+            if (cleanName) cardList.push(cleanName);
+          }
+        });
+      }
+      return cardList;
+    }
+
+    function parseCSVRow(rowText) {
+      const pattern = /(?!\s*$)\s*(?:'([^'\\]*(?:\\[\s\S][^'\\]*)*)'|"([^"\\]*(?:\\[\s\S][^"\\]*)*)"|([^,\s"]*))\s*(?:,|$)/g;
+      const result = [];
+      let match;
+      while ((match = pattern.exec(rowText)) !== null) {
+        if (match.index === pattern.lastIndex) pattern.lastIndex++;
+        result.push(match[1] || match[2] || match[3] || '');
+      }
+      return result;
+    }
+
+    function handleFileUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        document.getElementById('input-card-pool').value = e.target.result;
+        updateCardCount();
+      };
+      reader.readAsText(file);
+    }
+
+    function updatePlayerInputs(count) {
+      document.getElementById('player-count-label').innerText = count;
+      const container = document.getElementById('player-names-container');
+      const currentNames = Array.from(container.querySelectorAll('input')).map(i => i.value);
+      container.innerHTML = '';
+
+      for (let i = 0; i < count; i++) {
+        const defaultName = currentNames[i] || `Player ${i + 1}`;
+        const div = document.createElement('div');
+        div.className = 'flex items-center space-x-2';
+        div.innerHTML = `
+          <span class="text-xs text-slate-500 font-mono w-5 text-right">${i + 1}.</span>
+          <input type="text" value="${defaultName}" placeholder="Player ${i + 1} Name"
+                 class="player-name-input flex-1 bg-slate-900 border border-slate-700/70 rounded-lg px-3 py-1 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
+        `;
+        container.appendChild(div);
+      }
+    }
+
+    function setDraftMode(mode) {
+      appState.draftMode = mode;
+      document.getElementById('mode-snake').className = mode === 'snake'
+        ? "p-2.5 text-xs font-semibold rounded-xl border border-indigo-600 bg-indigo-900/40 text-indigo-200 flex flex-col items-center gap-1 transition"
+        : "p-2.5 text-xs font-semibold rounded-xl border border-slate-700 bg-slate-800 text-slate-400 flex flex-col items-center gap-1 transition";
+      
+      document.getElementById('mode-straight').className = mode === 'straight'
+        ? "p-2.5 text-xs font-semibold rounded-xl border border-indigo-600 bg-indigo-900/40 text-indigo-200 flex flex-col items-center gap-1 transition"
+        : "p-2.5 text-xs font-semibold rounded-xl border border-slate-700 bg-slate-800 text-slate-400 flex flex-col items-center gap-1 transition";
+    }
+
+    function loadPreset(key) {
+      if (CUBE_PRESETS[key]) {
+        document.getElementById('input-card-pool').value = CUBE_PRESETS[key].join('\n');
+        updateCardCount();
+      }
+    }
+
+    document.getElementById('input-card-pool').addEventListener('input', updateCardCount);
+
+    function updateCardCount() {
+      const text = document.getElementById('input-card-pool').value;
+      const parsed = parseCardList(text);
+      document.getElementById('card-count-badge').innerText = `Cards detected: ${parsed.length}`;
+    }
+
+    function toggleColorFilter(color) {
+      const btn = document.querySelector(`button[data-color="${color}"]`);
+      if (appState.activeColorFilters.has(color)) {
+        appState.activeColorFilters.delete(color);
+        btn.classList.add('opacity-40');
+        btn.classList.remove('ring-2', 'ring-indigo-400', 'opacity-100');
+      } else {
+        appState.activeColorFilters.add(color);
+        btn.classList.remove('opacity-40');
+        btn.classList.add('ring-2', 'ring-indigo-400', 'opacity-100');
+      }
+      applyFilters();
+    }
+
+    function applyFilters() {
+      appState.filterSearch = document.getElementById('filter-search').value.toLowerCase();
+      appState.filterType = document.getElementById('filter-type').value;
+      renderCardsGrid();
+    }
+
+    function setViewMode(mode) {
+      appState.viewMode = mode;
+      document.getElementById('view-btn-grid').className = mode === 'grid' ? "px-2 py-1 text-xs bg-indigo-600 text-white" : "px-2 py-1 text-xs text-slate-400 hover:text-white";
+      document.getElementById('view-btn-table').className = mode === 'table' ? "px-2 py-1 text-xs bg-indigo-600 text-white" : "px-2 py-1 text-xs text-slate-400 hover:text-white";
+      renderCardsGrid();
+    }
+
+    function setPoolDisplayMode(mode) {
+      appState.poolDisplayMode = mode;
+      document.getElementById('pool-view-list').className = mode === 'list' ? "text-[10px] px-1.5 py-0.5 rounded bg-indigo-600 text-white" : "text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 hover:text-white";
+      document.getElementById('pool-view-grid').className = mode === 'grid' ? "text-[10px] px-1.5 py-0.5 rounded bg-indigo-600 text-white" : "text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 hover:text-white";
+      renderPlayerPoolContent();
+    }
+
+    function setPoolGrouping(grouping) {
+      appState.poolGrouping = grouping;
+      document.getElementById('group-btn-type').className = grouping === 'type' ? "text-indigo-400 font-bold underline" : "text-slate-400 hover:text-slate-200";
+      document.getElementById('group-btn-cmc').className = grouping === 'cmc' ? "text-indigo-400 font-bold underline" : "text-slate-400 hover:text-slate-200";
+      renderPlayerPoolContent();
+    }
+
     function confirmReset() {
-      if (confirm("Are you sure you want to start a new draft? Current progress will be permanently lost.")) {
-        localStorage.removeItem(LOCAL_STORAGE_KEY);
+      if (confirm("Leave this draft room and create or join a new one?")) {
+        window.location.hash = '';
         location.reload();
       }
     }
 
     function getInitials(name) {
-      return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+      return name ? name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : 'P';
     }
   </script>
 </body>
