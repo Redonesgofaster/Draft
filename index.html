@@ -77,14 +77,15 @@
     import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
     // PASTE YOUR FIREBASE CONFIG HERE
-    const firebaseConfig = {
-      apiKey: "YOUR_API_KEY",
-      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-      projectId: "YOUR_PROJECT_ID",
-      storageBucket: "YOUR_PROJECT_ID.appspot.com",
-      messagingSenderId: "YOUR_SENDER_ID",
-      appId: "YOUR_APP_ID"
-    };
+     const firebaseConfig = {
+  apiKey: "AIzaSyDcBbijNZxkEEbvRaf6fUXrGd8yIagDqLM",
+  authDomain: "draft-6cadc.firebaseapp.com",
+  projectId: "draft-6cadc",
+  storageBucket: "draft-6cadc.firebasestorage.app",
+  messagingSenderId: "185016725869",
+  appId: "1:185016725869:web:db7402ddcfa8e9d3abaa64",
+  measurementId: "G-NZMZTSHD8D"
+};
 
     const app = initializeApp(firebaseConfig);
     window.db = getFirestore(app);
