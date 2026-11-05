@@ -77,15 +77,14 @@
     import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
     // PASTE YOUR FIREBASE CONFIG HERE
-     const firebaseConfig = {
-  apiKey: "AIzaSyDcBbijNZxkEEbvRaf6fUXrGd8yIagDqLM",
-  authDomain: "draft-6cadc.firebaseapp.com",
-  projectId: "draft-6cadc",
-  storageBucket: "draft-6cadc.firebasestorage.app",
-  messagingSenderId: "185016725869",
-  appId: "1:185016725869:web:db7402ddcfa8e9d3abaa64",
-  measurementId: "G-NZMZTSHD8D"
-};
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_PROJECT_ID.appspot.com",
+      messagingSenderId: "YOUR_SENDER_ID",
+      appId: "YOUR_APP_ID"
+    };
 
     const app = initializeApp(firebaseConfig);
     window.db = getFirestore(app);
@@ -252,12 +251,14 @@
       return Math.random().toString(36).substring(2, 8).toUpperCase();
     }
 
-    async function sendDiscordTurnNotification(webhookUrl, draftState, previousPickLog) {
-      if (!webhookUrl || !webhookUrl.startsWith("https://discord.com/api/webhooks/")) return;
+    // DISCORD IN-PLACE EDITING WEBHOOK NOTIFIER
+    async function sendOrUpdateDiscordTurnNotification(webhookUrl, draftState, previousPickLog) {
+      if (!webhookUrl || !webhookUrl.startsWith("https://discord.com/api/webhooks/")) return null;
 
       const activeSeat = draftState.pickSequence[draftState.currentPickIndex];
       const activePlayer = draftState.players[activeSeat];
       const currentPickNumber = draftState.currentPickIndex + 1;
+      const roomUrl = `${window.location.origin}${window.location.pathname}#${draftState.roomId}`;
 
       const lastPick = previousPickLog?.[0];
       const lastPickText = lastPick 
@@ -269,23 +270,26 @@
         avatar_url: "https://cards.scryfall.io/back.png",
         embeds: [
           {
-            title: `🔮 Turn Notification: ${activePlayer.name}`,
-            description: `It is now **${activePlayer.name}'s** turn to pick!\n\n📜 **Last Action:** ${lastPickText}`,
-            color: 15111189,
+            title: draftState.isFinished ? `🎉 Rotisserie Draft Complete!` : `🔮 Turn: ${activePlayer.name}`,
+            url: roomUrl,
+            description: draftState.isFinished 
+              ? `All **${draftState.totalCap}** picks have been made! Check your final deck pools.`
+              : `It is currently **${activePlayer.name}'s** turn to pick!\n\n📜 **Last Action:** ${lastPickText}`,
+            color: draftState.isFinished ? 3066993 : 15111189,
             fields: [
               {
                 name: "Draft Progress",
-                value: `Pick **${currentPickNumber}** of **${draftState.totalCap}**`,
+                value: `Pick **${Math.min(currentPickNumber, draftState.totalCap)}** of **${draftState.totalCap}**`,
                 inline: true
               },
               {
-                name: "Room Code",
-                value: `\`#${draftState.roomId}\``,
+                name: "Direct Room Link",
+                value: `[👉 Join Room #${draftState.roomId}](${roomUrl})`,
                 inline: true
               }
             ],
             footer: {
-              text: "Shandalar Rotisserie Draft Engine"
+              text: "Shandalar Rotisserie Draft Engine • Live Sync"
             },
             timestamp: new Date().toISOString()
           }
@@ -293,14 +297,32 @@
       };
 
       try {
-        await fetch(webhookUrl, {
+        if (draftState.discordMessageId) {
+          // EDIT EXISTING MESSAGE IN PLACE (PATCH)
+          const patchUrl = `${webhookUrl}/messages/${draftState.discordMessageId}`;
+          const res = await fetch(patchUrl, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(embedPayload)
+          });
+          if (res.ok) return draftState.discordMessageId;
+        }
+
+        // CREATE NEW INITIAL MESSAGE AND RETRIEVE ID (?wait=true)
+        const postUrl = `${webhookUrl}?wait=true`;
+        const res = await fetch(postUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(embedPayload)
         });
+        if (res.ok) {
+          const json = await res.json();
+          return json.id;
+        }
       } catch (err) {
         console.error("Discord Webhook Error:", err);
       }
+      return null;
     }
 
     function App() {
@@ -349,32 +371,43 @@
         }
       }, [window.db, window.location.hash]);
 
-      // Auto-Draft Trigger & Discord Webhook Notification
+      // Trigger automatic turn execution & Single Message Discord In-Place Update
       useEffect(() => {
-        if (!draftState || draftState.isFinished) return;
-        const activeSeat = draftState.pickSequence[draftState.currentPickIndex];
-        const activePlayer = draftState.players[activeSeat];
+        if (!draftState) return;
 
-        if (draftState.discordWebhook && draftState.lastNotifiedPick !== draftState.currentPickIndex) {
-          sendDiscordTurnNotification(draftState.discordWebhook, draftState, draftState.pickLog);
-          const updatedState = { ...draftState, lastNotifiedPick: draftState.currentPickIndex };
-          syncStateToFirestore(updatedState);
-        }
-
-        if (activePlayer && activePlayer.autoDraft && activePlayer.queue.length > 0) {
-          const topQueuedId = activePlayer.queue.find(id => 
-            draftState.availablePool.some(c => c.uniqueId === id)
-          );
-          if (topQueuedId) {
-            const cardToPick = draftState.availablePool.find(c => c.uniqueId === topQueuedId);
-            if (cardToPick) {
-              const timer = setTimeout(() => {
-                executePick(cardToPick, activeSeat);
-              }, 100);
-              return () => clearTimeout(timer);
+        const processWebhookAndAutoDraft = async () => {
+          // Trigger Discord In-Place Update if pick changed
+          if (draftState.discordWebhook && draftState.lastNotifiedPick !== draftState.currentPickIndex) {
+            const messageId = await sendOrUpdateDiscordTurnNotification(draftState.discordWebhook, draftState, draftState.pickLog);
+            if (messageId) {
+              const updatedState = { 
+                ...draftState, 
+                discordMessageId: messageId, 
+                lastNotifiedPick: draftState.currentPickIndex 
+              };
+              syncStateToFirestore(updatedState);
             }
           }
-        }
+
+          if (draftState.isFinished) return;
+          const activeSeat = draftState.pickSequence[draftState.currentPickIndex];
+          const activePlayer = draftState.players[activeSeat];
+
+          // Auto-Draft Trigger
+          if (activePlayer && activePlayer.autoDraft && activePlayer.queue.length > 0) {
+            const topQueuedId = activePlayer.queue.find(id => 
+              draftState.availablePool.some(c => c.uniqueId === id)
+            );
+            if (topQueuedId) {
+              const cardToPick = draftState.availablePool.find(c => c.uniqueId === topQueuedId);
+              if (cardToPick) {
+                setTimeout(() => executePick(cardToPick, activeSeat), 100);
+              }
+            }
+          }
+        };
+
+        processWebhookAndAutoDraft();
       }, [draftState?.currentPickIndex, draftState?.players]);
 
       useEffect(() => {
@@ -452,6 +485,7 @@
           totalCap: calculatedTotalCap,
           doublePickStart: doublePickStart,
           discordWebhook: discordWebhook.trim(),
+          discordMessageId: null,
           lastNotifiedPick: -1,
           pickLog: []
         };
@@ -765,7 +799,7 @@
                         placeholder="https://discord.com/api/webhooks/..."
                         className="w-full bg-slate-900 border border-amber-900/60 rounded p-2 text-amber-100 focus:border-amber-400 outline-none font-mono text-[11px]"
                       />
-                      <span className="text-[10px] text-amber-200/50 mt-1 block">Sends turn notifications to your Discord channel without spamming.</span>
+                      <span className="text-[10px] text-amber-200/50 mt-1 block">Updates a single status embed in-place on every pick.</span>
                     </div>
 
                     <div>
@@ -995,7 +1029,7 @@
                       })}
                     </div>
                   ) : (
-                    /* LIST VIEW WITH POPUP PREVIEW (HOVER ON PC, CLICK ON MOBILE) */
+                    /* LIST VIEW WITH HOVER/CLICK CARD PREVIEW */
                     <div className="bg-slate-950/80 border border-amber-900/60 rounded-xl divide-y divide-amber-900/40">
                       {filteredPool.map(card => {
                         const isQueued = mySeat !== null && draftState.players[mySeat].queue.includes(card.uniqueId);
