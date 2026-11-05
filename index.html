@@ -5,12 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Shandalar Rotisserie Draft Engine</title>
   
-  <!-- Tailwind CSS, React, and LZ-String CDN -->
+  <!-- Tailwind CSS & React -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/lz-string@1.5.0/libs/lz-string.min.js"></script>
 
   <!-- Shandalar Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -21,7 +20,6 @@
     .font-shandalar { font-family: 'Cinzel', serif; }
     .font-parchment { font-family: 'MedievalSharp', cursive; }
 
-    /* Shandalar Dungeon Wood & Stone Background */
     .bg-shandalar-wood {
       background: #0d0907;
       background-image: 
@@ -30,7 +28,6 @@
         linear-gradient(to bottom, #18100b, #090604);
     }
 
-    /* Shandalar Parchment Modal Overlay */
     .bg-parchment {
       background: #e2d1a6;
       background-image: radial-gradient(circle at 50% 50%, #eee3c3, #cbb685);
@@ -48,7 +45,6 @@
       text-shadow: 0 0 10px rgba(245, 158, 11, 0.6), 0 0 20px rgba(180, 83, 9, 0.4);
     }
 
-    /* Mana Gem Graphics */
     .mana-orb {
       width: 18px;
       height: 18px;
@@ -66,7 +62,6 @@
     .mana-b { background: radial-gradient(circle at 35% 35%, #475569, #1e293b, #020617); color: #f8fafc; }
     .mana-r { background: radial-gradient(circle at 35% 35%, #fef2f2, #ef4444, #991b1b); color: #450a0a; }
     .mana-g { background: radial-gradient(circle at 35% 35%, #f0fdf4, #4ade80, #15803d); color: #052e16; }
-    .mana-c { background: radial-gradient(circle at 35% 35%, #f1f5f9, #94a3b8, #475569); color: #0f172a; }
 
     .custom-scroll::-webkit-scrollbar { width: 6px; }
     .custom-scroll::-webkit-scrollbar-track { background: #0f0b08; }
@@ -76,10 +71,30 @@
 <body class="bg-shandalar-wood text-amber-100 min-h-screen font-sans antialiased">
   <div id="root"></div>
 
+  <!-- Firebase Modular JS SDK -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+    // PASTE YOUR FIREBASE CONFIG HERE
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_PROJECT_ID.appspot.com",
+      messagingSenderId: "YOUR_SENDER_ID",
+      appId: "YOUR_APP_ID"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    window.db = getFirestore(app);
+    window.firestoreTools = { doc, setDoc, onSnapshot };
+  </script>
+
   <script type="text/babel">
     const { useState, useEffect, useMemo } = React;
 
-    // SVG Graphics Components
+    // SVG Graphics
     const SparklesIcon = () => (
       <svg className="w-6 h-6 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></svg>
     );
@@ -96,10 +111,9 @@
       <svg className="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
     );
     const LockIcon = () => (
-      <svg className="w-6 h-6 text-amber-600/60 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+      <svg className="w-6 h-6 text-amber-600/60 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
     );
 
-    // Clean CSV Lines
     function parseCsvLine(text) {
       const result = [];
       let cell = '';
@@ -128,7 +142,6 @@
       return name;
     }
 
-    // Scryfall Batch Fetcher
     async function fetchScryfallBatch(cardNames) {
       const cleanedNames = cardNames.map(cleanCardName).filter(n => n.length > 0);
       const uniqueNames = Array.from(new Set(cleanedNames));
@@ -240,6 +253,10 @@
       return sequence;
     }
 
+    function generateRoomId() {
+      return Math.random().toString(36).substring(2, 8).toUpperCase();
+    }
+
     function App() {
       const [parsedPool, setParsedPool] = useState([]);
       const [isLoading, setIsLoading] = useState(false);
@@ -250,6 +267,7 @@
         Array.from({ length: 4 }, (_, i) => `Drafter ${i + 1}`)
       );
 
+      const [roomId, setRoomId] = useState("");
       const [draftState, setDraftState] = useState(null);
       const [mySeat, setMySeat] = useState(null);
       const [hasChosenSeat, setHasChosenSeat] = useState(false);
@@ -262,6 +280,22 @@
       const [displayStyle, setDisplayStyle] = useState("GRID");
       const [viewTab, setViewTab] = useState("pool");
 
+      // Realtime Firebase Listener on Room Code Hash
+      useEffect(() => {
+        const hash = window.location.hash.replace("#", "").trim();
+        if (hash.length > 0 && window.db) {
+          setRoomId(hash);
+          const { doc, onSnapshot } = window.firestoreTools;
+          const unsub = onSnapshot(doc(window.db, "drafts", hash), (docSnap) => {
+            if (docSnap.exists()) {
+              const data = docSnap.data();
+              setDraftState(data);
+            }
+          });
+          return () => unsub();
+        }
+      }, [window.db, window.location.hash]);
+
       useEffect(() => {
         setPlayerNames(prev => {
           if (prev.length === numPlayers) return prev;
@@ -272,19 +306,6 @@
           return prev.slice(0, numPlayers);
         });
       }, [numPlayers]);
-
-      useEffect(() => {
-        if (window.location.hash && window.location.hash.length > 1) {
-          try {
-            const compressed = window.location.hash.substring(1);
-            const jsonStr = LZString.decompressFromEncodedURIComponent(compressed);
-            if (jsonStr) {
-              const compact = JSON.parse(jsonStr);
-              window._pendingState = compact;
-            }
-          } catch (e) {}
-        }
-      }, []);
 
       const handleCsvUpload = async (file) => {
         if (!file) return;
@@ -318,37 +339,6 @@
 
         setParsedPool(cardList);
         setIsLoading(false);
-
-        if (window._pendingState) {
-          rehydrateCompactSession(window._pendingState, cardList);
-          window._pendingState = null;
-        }
-      };
-
-      const rehydrateCompactSession = (compact, pool) => {
-        const players = compact.pl.map(p => ({
-          id: p.i,
-          name: p.n,
-          pool: p.p.map(idx => pool[idx]).filter(Boolean),
-          queue: p.q.map(idx => pool[idx]?.uniqueId).filter(Boolean),
-          autoDraft: !!p.a
-        }));
-
-        const availablePool = pool.filter((_, idx) => !compact.d.includes(idx));
-        const pickSequence = generateRotisseriePickSequence(compact.np, compact.tc, compact.dp);
-
-        const restoredSession = {
-          players,
-          availablePool,
-          pickSequence,
-          currentPickIndex: compact.cp,
-          totalCap: compact.tc,
-          doublePickStart: compact.dp,
-          pickLog: compact.lg || []
-        };
-
-        setDraftState(restoredSession);
-        setHasChosenSeat(false);
       };
 
       const calculatedTotalCap = useMemo(() => {
@@ -359,9 +349,10 @@
         return parsedPool.length;
       }, [parsedPool.length, numPlayers, packPreset]);
 
-      const startDraft = () => {
+      const startDraft = async () => {
         if (parsedPool.length === 0) return;
 
+        const newRoomId = generateRoomId();
         const players = playerNames.map((name, i) => ({
           id: i,
           name: name || `Drafter ${i + 1}`,
@@ -373,8 +364,9 @@
         const pickSequence = generateRotisseriePickSequence(numPlayers, calculatedTotalCap, doublePickStart);
 
         const newSession = {
+          roomId: newRoomId,
           players,
-          availablePool: [...parsedPool],
+          availablePool: parsedPool,
           pickSequence,
           currentPickIndex: 0,
           totalCap: calculatedTotalCap,
@@ -382,45 +374,23 @@
           pickLog: []
         };
 
+        setRoomId(newRoomId);
+        window.location.hash = newRoomId;
+
+        if (window.db) {
+          const { doc, setDoc } = window.firestoreTools;
+          await setDoc(doc(window.db, "drafts", newRoomId), newSession);
+        }
+
         setDraftState(newSession);
         setHasChosenSeat(false);
-        updateUrlState(newSession);
       };
 
-      const updateUrlState = (state) => {
-        if (!parsedPool.length) return;
-        try {
-          const cardIndexMap = new Map();
-          parsedPool.forEach((c, idx) => cardIndexMap.set(c.uniqueId, idx));
-
-          const draftedIndices = [];
-          state.players.forEach(p => {
-            p.pool.forEach(c => {
-              const idx = cardIndexMap.get(c.uniqueId);
-              if (idx !== undefined) draftedIndices.push(idx);
-            });
-          });
-
-          const compactPayload = {
-            np: state.players.length,
-            tc: state.totalCap,
-            dp: state.doublePickStart,
-            cp: state.currentPickIndex,
-            d: draftedIndices,
-            pl: state.players.map(p => ({
-              i: p.id,
-              n: p.name,
-              p: p.pool.map(c => cardIndexMap.get(c.uniqueId)).filter(v => v !== undefined),
-              q: p.queue.map(id => cardIndexMap.get(id)).filter(v => v !== undefined),
-              a: p.autoDraft ? 1 : 0
-            })),
-            lg: state.pickLog.slice(0, 30)
-          };
-
-          const jsonStr = JSON.stringify(compactPayload);
-          const compressed = LZString.compressToEncodedURIComponent(jsonStr);
-          window.history.replaceState(null, "", `#${compressed}`);
-        } catch (e) {}
+      const syncStateToFirestore = async (newState) => {
+        if (window.db && roomId) {
+          const { doc, setDoc } = window.firestoreTools;
+          await setDoc(doc(window.db, "drafts", roomId), newState);
+        }
       };
 
       const executePick = (card, seatIdx) => {
@@ -463,7 +433,7 @@
         }
 
         setDraftState(nextState);
-        updateUrlState(nextState);
+        syncStateToFirestore(nextState);
       };
 
       const toggleQueue = (cardId) => {
@@ -479,7 +449,7 @@
 
         const nextState = { ...draftState, players: updatedPlayers };
         setDraftState(nextState);
-        updateUrlState(nextState);
+        syncStateToFirestore(nextState);
       };
 
       const toggleAutoDraft = () => {
@@ -490,7 +460,7 @@
 
         const nextState = { ...draftState, players: updatedPlayers };
         setDraftState(nextState);
-        updateUrlState(nextState);
+        syncStateToFirestore(nextState);
 
         const activeSeat = nextState.pickSequence[nextState.currentPickIndex];
         if (player.autoDraft && mySeat === activeSeat && player.queue.length > 0) {
@@ -535,7 +505,7 @@
       return (
         <div className="max-w-7xl mx-auto p-4 md:p-6 min-h-screen flex flex-col relative">
           
-          {/* MANDATORY SEAT SELECTION MODAL */}
+          {/* SEAT SELECTION MODAL */}
           {draftState && !hasChosenSeat && (
             <div className="fixed inset-0 bg-slate-950/90 z-50 flex items-center justify-center p-4 backdrop-blur-md">
               <div className="bg-parchment rounded-2xl p-6 md:p-8 max-w-lg w-full text-center relative shadow-2xl">
@@ -546,7 +516,7 @@
                   Identify Your Seat
                 </h2>
                 <p className="text-xs font-parchment text-amber-900/80 mb-6">
-                  Select your assigned drafter seat to claim your spellbook & draft queue.
+                  Room <strong className="font-mono text-amber-950">{roomId}</strong> — Select your assigned seat to draft.
                 </p>
 
                 <div className="grid grid-cols-2 gap-2.5 mb-6 max-h-60 overflow-y-auto pr-1 custom-scroll">
@@ -603,7 +573,7 @@
                   onClick={copyShareableLink}
                   className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold rounded-lg text-xs transition shadow-lg flex items-center gap-1"
                 >
-                  {copiedLink ? "✓ Short Link Copied!" : "Share State Link"}
+                  {copiedLink ? "✓ Room Link Copied!" : `Share Room #${roomId}`}
                 </button>
 
                 <button
@@ -621,10 +591,10 @@
                 </button>
 
                 <button 
-                  onClick={() => { setDraftState(null); window.location.hash = ""; }} 
+                  onClick={() => { setDraftState(null); window.location.hash = ""; setRoomId(""); }} 
                   className="px-3 py-1.5 bg-rose-950/80 text-rose-300 rounded-lg border border-rose-800/60 hover:bg-rose-900 text-xs"
                 >
-                  Reset
+                  Exit Session
                 </button>
               </div>
             )}
@@ -739,7 +709,7 @@
                   disabled={parsedPool.length === 0}
                   className="w-full mt-6 py-3 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-slate-950 font-black font-shandalar rounded-xl shadow-lg transition disabled:opacity-40 disabled:cursor-not-allowed text-sm"
                 >
-                  Launch Rotisserie Session ({calculatedTotalCap} Picks)
+                  Create Cloud Room ({calculatedTotalCap} Picks)
                 </button>
               </div>
             </div>
@@ -1023,7 +993,6 @@
                         </div>
 
                         {isMyQueue ? (
-                          /* Visible Personal Queue */
                           <div className="space-y-2 flex-1 overflow-y-auto max-h-[60vh] pr-1 custom-scroll">
                             {player.queue.length > 0 ? (
                               player.queue.map((cardId, index) => {
@@ -1043,7 +1012,6 @@
                             )}
                           </div>
                         ) : (
-                          /* Obscured Opponent Queue */
                           <div className="flex-1 flex flex-col items-center justify-center p-6 text-center border border-dashed border-amber-900/40 rounded-xl bg-slate-900/40">
                             <LockIcon />
                             <span className="text-xs font-bold text-amber-400 font-shandalar block mt-1">Secret Queue</span>
