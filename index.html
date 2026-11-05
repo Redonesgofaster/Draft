@@ -5,62 +5,142 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Shandalar Rotisserie Draft Engine</title>
   
-  <!-- Tailwind CSS, React, Lucide Icons & LZ-String Compression -->
+  <!-- Tailwind CSS, React, and LZ-String CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <script src="https://unpkg.com/lucide-react@0.263.1/dist/umd/lucide-react.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/lz-string@1.5.0/libs/lz-string.min.js"></script>
 
-  <style>
-    @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800;900&family=MedievalSharp&display=swap');
+  <!-- Shandalar Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=MedievalSharp&display=swap" rel="stylesheet">
 
+  <style>
     .font-shandalar { font-family: 'Cinzel', serif; }
     .font-parchment { font-family: 'MedievalSharp', cursive; }
 
-    /* Custom Shandalar Fantasy Theme */
+    /* Shandalar Dungeon Wood & Stone Background */
     .bg-shandalar-wood {
-      background: #0f0b08;
+      background: #0d0907;
       background-image: 
-        radial-gradient(circle at 50% 0%, rgba(120, 53, 15, 0.25), transparent 70%),
-        linear-gradient(to bottom, #19100a, #0b0704);
+        radial-gradient(circle at 50% 0%, rgba(180, 83, 9, 0.25), transparent 75%),
+        radial-gradient(circle at 10% 90%, rgba(30, 27, 75, 0.4), transparent 50%),
+        linear-gradient(to bottom, #18100b, #090604);
     }
-    
+
+    /* Shandalar Parchment Modal Overlay */
+    .bg-parchment {
+      background: #e2d1a6;
+      background-image: radial-gradient(circle at 50% 50%, #eee3c3, #cbb685);
+      color: #261708;
+      box-shadow: 0 0 25px rgba(0,0,0,0.9), inset 0 0 15px rgba(100,60,20,0.4);
+      border: 3px solid #854d0e;
+    }
+
     .gold-border {
       border: 2px solid #b45309;
-      box-shadow: 0 0 10px rgba(180, 83, 9, 0.3), inset 0 0 8px rgba(0,0,0,0.8);
+      box-shadow: 0 0 12px rgba(180, 83, 9, 0.35), inset 0 0 10px rgba(0,0,0,0.8);
     }
 
     .gold-text-glow {
-      text-shadow: 0 0 8px rgba(245, 158, 11, 0.5);
+      text-shadow: 0 0 10px rgba(245, 158, 11, 0.6), 0 0 20px rgba(180, 83, 9, 0.4);
     }
 
-    /* Hide scrollbars for clean UI */
-    .no-scrollbar::-webkit-scrollbar { display: none; }
-    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    /* Mana Gem Graphics */
+    .mana-orb {
+      width: 18px;
+      height: 18px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 9999px;
+      font-weight: 900;
+      font-size: 11px;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+      box-shadow: inset -2px -2px 4px rgba(0,0,0,0.6), 0 0 6px currentColor;
+    }
+    .mana-w { background: radial-gradient(circle at 35% 35%, #fffbeb, #fef08a, #ca8a04); color: #713f12; }
+    .mana-u { background: radial-gradient(circle at 35% 35%, #e0f2fe, #38bdf8, #0369a1); color: #0c4a6e; }
+    .mana-b { background: radial-gradient(circle at 35% 35%, #475569, #1e293b, #020617); color: #f8fafc; }
+    .mana-r { background: radial-gradient(circle at 35% 35%, #fef2f2, #ef4444, #991b1b); color: #450a0a; }
+    .mana-g { background: radial-gradient(circle at 35% 35%, #f0fdf4, #4ade80, #15803d); color: #052e16; }
+    .mana-c { background: radial-gradient(circle at 35% 35%, #f1f5f9, #94a3b8, #475569); color: #0f172a; }
+
+    .custom-scroll::-webkit-scrollbar { width: 6px; }
+    .custom-scroll::-webkit-scrollbar-track { background: #0f0b08; }
+    .custom-scroll::-webkit-scrollbar-thumb { background: #b45309; border-radius: 4px; }
   </style>
 </head>
-<body class="bg-shandalar-wood text-amber-100 min-h-screen font-sans antialiased selection:bg-amber-600 selection:text-slate-950">
+<body class="bg-shandalar-wood text-amber-100 min-h-screen font-sans antialiased">
   <div id="root"></div>
 
   <script type="text/babel">
-    const { useState, useEffect, useMemo, useRef } = React;
-    const { 
-      Upload, Play, RefreshCw, Layers, Users, Settings, 
-      Copy, Check, Eye, FileText, ArrowRightLeft, Shield, Sparkles,
-      ListOrdered, CheckCircle2, ChevronRight, BookmarkPlus, Zap
-    } = lucideReact;
+    const { useState, useEffect, useMemo } = React;
 
-    // Scryfall Batch Fetcher (Chunked up to 75 per HTTP request)
+    // SVG Graphics Components
+    const SparklesIcon = () => (
+      <svg className="w-6 h-6 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></svg>
+    );
+    const UploadIcon = () => (
+      <svg className="w-8 h-8 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+    );
+    const ExternalLinkIcon = () => (
+      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+    );
+    const UserIcon = () => (
+      <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+    );
+    const ScrollIcon = () => (
+      <svg className="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+    );
+    const LockIcon = () => (
+      <svg className="w-6 h-6 text-amber-600/60 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+    );
+
+    // Clean CSV Lines
+    function parseCsvLine(text) {
+      const result = [];
+      let cell = '';
+      let inQuotes = false;
+      for (let i = 0; i < text.length; i++) {
+        const c = text[i];
+        if (c === '"') {
+          inQuotes = !inQuotes;
+        } else if (c === ',' && !inQuotes) {
+          result.push(cell.trim().replace(/^"|"$/g, ''));
+          cell = '';
+        } else {
+          cell += c;
+        }
+      }
+      result.push(cell.trim().replace(/^"|"$/g, ''));
+      return result;
+    }
+
+    function cleanCardName(rawName) {
+      if (!rawName) return "";
+      let name = rawName.trim().replace(/\s\([A-Z0-9]+\)\s?\d*/g, "");
+      if (name.includes("/") && !name.includes("//")) {
+        name = name.replace(/\s*\/\s*/g, " // ");
+      }
+      return name;
+    }
+
+    // Scryfall Batch Fetcher
     async function fetchScryfallBatch(cardNames) {
-      const uniqueNames = Array.from(new Set(cardNames));
+      const cleanedNames = cardNames.map(cleanCardName).filter(n => n.length > 0);
+      const uniqueNames = Array.from(new Set(cleanedNames));
+      
       const chunks = [];
-      for (let i = 0; i < uniqueNames.length; i += 75) {
-        chunks.push(uniqueNames.slice(i, i + 75));
+      for (let i = 0; i < uniqueNames.length; i += 50) {
+        chunks.push(uniqueNames.slice(i, i + 50));
       }
 
       const map = {};
+      const missingNames = [];
+
       for (const chunk of chunks) {
         try {
           const res = await fetch("https://api.scryfall.com/cards/collection", {
@@ -69,30 +149,65 @@
             body: JSON.stringify({ identifiers: chunk.map(name => ({ name })) })
           });
           const json = await res.json();
+          
           if (json.data) {
             json.data.forEach(card => {
               const img = card.image_uris?.normal || 
                           card.card_faces?.[0]?.image_uris?.normal || 
                           "https://cards.scryfall.io/back.png";
-              map[card.name.toLowerCase()] = {
+              const scryfallUri = card.scryfall_uri || `https://scryfall.com/search?q=${encodeURIComponent(card.name)}`;
+              
+              const entry = {
                 id: card.id,
                 name: card.name,
                 image: img,
-                cmc: card.cmc || 0,
+                scryfallUri: scryfallUri,
+                cmc: card.cmc ?? 0,
                 colors: card.colors || (card.card_faces?.[0]?.colors) || ["C"],
                 type: card.type_line || "Card"
               };
+
+              map[card.name.toLowerCase()] = entry;
+              chunk.forEach(reqName => {
+                if (reqName.toLowerCase().includes(card.name.toLowerCase()) || card.name.toLowerCase().includes(reqName.toLowerCase())) {
+                  map[reqName.toLowerCase()] = entry;
+                }
+              });
             });
           }
-          await new Promise(r => setTimeout(r, 100)); // Respect Scryfall 100ms rate limits
-        } catch (err) {
-          console.error("Scryfall batch fetch failed:", err);
-        }
+
+          if (json.not_found) {
+            json.not_found.forEach(nf => {
+              if (nf.name) missingNames.push(nf.name);
+            });
+          }
+          await new Promise(r => setTimeout(r, 120));
+        } catch (err) {}
       }
+
+      for (const missingName of missingNames) {
+        try {
+          const res = await fetch(`https://api.scryfall.com/cards/named?exact=${encodeURIComponent(missingName)}`);
+          if (res.ok) {
+            const card = await res.json();
+            const img = card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal || "https://cards.scryfall.io/back.png";
+            map[missingName.toLowerCase()] = {
+              id: card.id,
+              name: card.name,
+              image: img,
+              scryfallUri: card.scryfall_uri,
+              cmc: card.cmc ?? 0,
+              colors: card.colors || (card.card_faces?.[0]?.colors) || ["C"],
+              type: card.type_line || "Card"
+            };
+          }
+          await new Promise(r => setTimeout(r, 100));
+        } catch (e) {}
+      }
+
       return map;
     }
 
-    // Helper: Build Full Rotisserie Turn Pick Order
     function generateRotisseriePickSequence(numPlayers, totalCap, doublePickStartPick) {
       const sequence = [];
       let forward = true;
@@ -100,7 +215,7 @@
 
       while (sequence.length < totalCap) {
         const pickNumber = sequence.length + 1;
-        const picksAllowedThisTurn = (pickNumber >= doublePickStartPick) ? 2 : 1;
+        const picksAllowedThisTurn = (doublePickStartPick > 0 && pickNumber > doublePickStartPick) ? 2 : 1;
 
         for (let p = 0; p < picksAllowedThisTurn; p++) {
           if (sequence.length < totalCap) {
@@ -108,7 +223,6 @@
           }
         }
 
-        // Snake logic shift
         if (forward) {
           if (currentSeat === numPlayers - 1) {
             forward = false;
@@ -127,25 +241,27 @@
     }
 
     function App() {
-      // Configuration & Setup State
       const [parsedPool, setParsedPool] = useState([]);
       const [isLoading, setIsLoading] = useState(false);
       const [numPlayers, setNumPlayers] = useState(4);
-      const [totalDraftCap, setTotalDraftCap] = useState(180);
-      const [doublePickThreshold, setDoublePickThreshold] = useState(90);
+      const [packPreset, setPackPreset] = useState("3x15");
+      const [doublePickStart, setDoublePickStart] = useState(20);
       const [playerNames, setPlayerNames] = useState(
         Array.from({ length: 4 }, (_, i) => `Drafter ${i + 1}`)
       );
 
-      // Active Session State
       const [draftState, setDraftState] = useState(null);
-      const [mySeat, setMySeat] = useState(null); // null = spectator
+      const [mySeat, setMySeat] = useState(null);
+      const [hasChosenSeat, setHasChosenSeat] = useState(false);
       const [copiedLink, setCopiedLink] = useState(false);
+      const [showLogDrawer, setShowLogDrawer] = useState(false);
+
       const [searchTerm, setSearchTerm] = useState("");
       const [colorFilter, setColorFilter] = useState("ALL");
-      const [viewTab, setViewTab] = useState("pool"); // "pool" | "queues" | "pools"
+      const [sortBy, setSortBy] = useState("NAME");
+      const [displayStyle, setDisplayStyle] = useState("GRID");
+      const [viewTab, setViewTab] = useState("pool");
 
-      // Sync player name count with seat slider
       useEffect(() => {
         setPlayerNames(prev => {
           if (prev.length === numPlayers) return prev;
@@ -157,23 +273,19 @@
         });
       }, [numPlayers]);
 
-      // Load session state from URL hash on load
       useEffect(() => {
         if (window.location.hash && window.location.hash.length > 1) {
           try {
             const compressed = window.location.hash.substring(1);
             const jsonStr = LZString.decompressFromEncodedURIComponent(compressed);
             if (jsonStr) {
-              const loadedState = JSON.parse(jsonStr);
-              setDraftState(loadedState);
+              const compact = JSON.parse(jsonStr);
+              window._pendingState = compact;
             }
-          } catch (e) {
-            console.error("Failed to parse URL hash state", e);
-          }
+          } catch (e) {}
         }
       }, []);
 
-      // CSV File Reader
       const handleCsvUpload = async (file) => {
         if (!file) return;
         setIsLoading(true);
@@ -183,19 +295,21 @@
         
         lines.forEach((line, idx) => {
           if (idx === 0 && line.toLowerCase().includes("name")) return;
-          const parts = line.split(/,(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)/);
-          let name = parts[0]?.replace(/^"|"$/g, '').trim();
+          const parts = parseCsvLine(line);
+          let name = parts[0]?.trim();
           if (name) names.push(name);
         });
 
         const fetchedMap = await fetchScryfallBatch(names);
         
-        const cardList = names.map((name, index) => {
-          const fetched = fetchedMap[name.toLowerCase()];
+        const cardList = names.map((rawName, index) => {
+          const cleaned = cleanCardName(rawName);
+          const fetched = fetchedMap[cleaned.toLowerCase()] || fetchedMap[rawName.toLowerCase()];
           return fetched ? { ...fetched, uniqueId: `${fetched.id}-${index}` } : {
             uniqueId: `custom-${index}`,
-            name: name,
+            name: rawName,
             image: "https://cards.scryfall.io/back.png",
+            scryfallUri: `https://scryfall.com/search?q=${encodeURIComponent(rawName)}`,
             cmc: 0,
             colors: ["C"],
             type: "Card"
@@ -203,12 +317,48 @@
         });
 
         setParsedPool(cardList);
-        setTotalDraftCap(Math.min(cardList.length, numPlayers * 45));
-        setDoublePickThreshold(Math.floor(cardList.length / 2));
         setIsLoading(false);
+
+        if (window._pendingState) {
+          rehydrateCompactSession(window._pendingState, cardList);
+          window._pendingState = null;
+        }
       };
 
-      // Launch Rotisserie Session
+      const rehydrateCompactSession = (compact, pool) => {
+        const players = compact.pl.map(p => ({
+          id: p.i,
+          name: p.n,
+          pool: p.p.map(idx => pool[idx]).filter(Boolean),
+          queue: p.q.map(idx => pool[idx]?.uniqueId).filter(Boolean),
+          autoDraft: !!p.a
+        }));
+
+        const availablePool = pool.filter((_, idx) => !compact.d.includes(idx));
+        const pickSequence = generateRotisseriePickSequence(compact.np, compact.tc, compact.dp);
+
+        const restoredSession = {
+          players,
+          availablePool,
+          pickSequence,
+          currentPickIndex: compact.cp,
+          totalCap: compact.tc,
+          doublePickStart: compact.dp,
+          pickLog: compact.lg || []
+        };
+
+        setDraftState(restoredSession);
+        setHasChosenSeat(false);
+      };
+
+      const calculatedTotalCap = useMemo(() => {
+        if (!parsedPool.length) return 0;
+        if (packPreset === "3x15") return Math.min(parsedPool.length, numPlayers * 45);
+        if (packPreset === "4x11") return Math.min(parsedPool.length, numPlayers * 44);
+        if (packPreset === "4x15") return Math.min(parsedPool.length, numPlayers * 60);
+        return parsedPool.length;
+      }, [parsedPool.length, numPlayers, packPreset]);
+
       const startDraft = () => {
         if (parsedPool.length === 0) return;
 
@@ -216,48 +366,71 @@
           id: i,
           name: name || `Drafter ${i + 1}`,
           pool: [],
-          queue: [], // Array of card uniqueIds
+          queue: [],
           autoDraft: false
         }));
 
-        const pickSequence = generateRotisseriePickSequence(numPlayers, totalDraftCap, doublePickThreshold);
+        const pickSequence = generateRotisseriePickSequence(numPlayers, calculatedTotalCap, doublePickStart);
 
         const newSession = {
           players,
           availablePool: [...parsedPool],
           pickSequence,
           currentPickIndex: 0,
-          totalCap: totalDraftCap,
-          doublePickStart: doublePickThreshold,
+          totalCap: calculatedTotalCap,
+          doublePickStart: doublePickStart,
           pickLog: []
         };
 
         setDraftState(newSession);
+        setHasChosenSeat(false);
         updateUrlState(newSession);
       };
 
-      // Sync state into URL hash
       const updateUrlState = (state) => {
+        if (!parsedPool.length) return;
         try {
-          const jsonStr = JSON.stringify(state);
+          const cardIndexMap = new Map();
+          parsedPool.forEach((c, idx) => cardIndexMap.set(c.uniqueId, idx));
+
+          const draftedIndices = [];
+          state.players.forEach(p => {
+            p.pool.forEach(c => {
+              const idx = cardIndexMap.get(c.uniqueId);
+              if (idx !== undefined) draftedIndices.push(idx);
+            });
+          });
+
+          const compactPayload = {
+            np: state.players.length,
+            tc: state.totalCap,
+            dp: state.doublePickStart,
+            cp: state.currentPickIndex,
+            d: draftedIndices,
+            pl: state.players.map(p => ({
+              i: p.id,
+              n: p.name,
+              p: p.pool.map(c => cardIndexMap.get(c.uniqueId)).filter(v => v !== undefined),
+              q: p.queue.map(id => cardIndexMap.get(id)).filter(v => v !== undefined),
+              a: p.autoDraft ? 1 : 0
+            })),
+            lg: state.pickLog.slice(0, 30)
+          };
+
+          const jsonStr = JSON.stringify(compactPayload);
           const compressed = LZString.compressToEncodedURIComponent(jsonStr);
           window.history.replaceState(null, "", `#${compressed}`);
-        } catch (e) {
-          console.error("URL state sync failed:", e);
-        }
+        } catch (e) {}
       };
 
-      // Execute a Pick Action
       const executePick = (card, seatIdx) => {
         if (!draftState) return;
-
         const activeSeat = draftState.pickSequence[draftState.currentPickIndex];
-        if (seatIdx !== undefined && seatIdx !== activeSeat) return; // Prevent out of turn picks
+        if (seatIdx !== undefined && seatIdx !== activeSeat) return;
 
         const updatedPlayers = [...draftState.players];
         const targetPlayer = updatedPlayers[activeSeat];
 
-        // Add card to player pool and clean up queue
         targetPlayer.pool.push(card);
         targetPlayer.queue = targetPlayer.queue.filter(id => id !== card.uniqueId);
 
@@ -274,18 +447,15 @@
           isFinished: nextPickIndex >= draftState.pickSequence.length || updatedAvailablePool.length === 0
         };
 
-        // Check if next player has Auto-Draft turned ON
         if (!nextState.isFinished) {
           const nextSeat = nextState.pickSequence[nextPickIndex];
           const nextPlayer = nextState.players[nextSeat];
 
           if (nextPlayer.autoDraft && nextPlayer.queue.length > 0) {
-            // Find highest queued card available in pool
             const autoPickCardId = nextPlayer.queue.find(id => nextState.availablePool.some(c => c.uniqueId === id));
             if (autoPickCardId) {
               const autoCard = nextState.availablePool.find(c => c.uniqueId === autoPickCardId);
               if (autoCard) {
-                // Recursively execute auto-draft pick
                 setTimeout(() => executePick(autoCard, nextSeat), 300);
               }
             }
@@ -296,10 +466,8 @@
         updateUrlState(nextState);
       };
 
-      // Toggle Queue Item for Logged-In Seat
       const toggleQueue = (cardId) => {
         if (mySeat === null || !draftState) return;
-
         const updatedPlayers = [...draftState.players];
         const player = updatedPlayers[mySeat];
         
@@ -314,10 +482,8 @@
         updateUrlState(nextState);
       };
 
-      // Toggle Auto-Draft Mode for Logged-In Seat
       const toggleAutoDraft = () => {
         if (mySeat === null || !draftState) return;
-
         const updatedPlayers = [...draftState.players];
         const player = updatedPlayers[mySeat];
         player.autoDraft = !player.autoDraft;
@@ -326,7 +492,6 @@
         setDraftState(nextState);
         updateUrlState(nextState);
 
-        // Trigger immediate pick if it's currently their turn and auto-draft turned on
         const activeSeat = nextState.pickSequence[nextState.currentPickIndex];
         if (player.autoDraft && mySeat === activeSeat && player.queue.length > 0) {
           const topQueuedId = player.queue.find(id => nextState.availablePool.some(c => c.uniqueId === id));
@@ -337,37 +502,98 @@
         }
       };
 
-      // Copy Shareable Link to Clipboard
       const copyShareableLink = () => {
         navigator.clipboard.writeText(window.location.href);
         setCopiedLink(true);
         setTimeout(() => setCopiedLink(false), 2000);
       };
 
-      // Filtered Available Cards
       const filteredPool = useMemo(() => {
         if (!draftState) return [];
-        return draftState.availablePool.filter(card => {
+        let pool = draftState.availablePool.filter(card => {
           const matchesSearch = card.name.toLowerCase().includes(searchTerm.toLowerCase());
-          const matchesColor = colorFilter === "ALL" || 
-                               (colorFilter === "C" && (card.colors.length === 0 || card.colors.includes("C"))) ||
-                               card.colors.includes(colorFilter);
+          let matchesColor = true;
+          if (colorFilter === "C") matchesColor = card.colors.length === 0 || card.colors.includes("C");
+          else if (colorFilter === "M") matchesColor = card.colors.length > 1;
+          else if (colorFilter !== "ALL") matchesColor = card.colors.includes(colorFilter);
           return matchesSearch && matchesColor;
         });
-      }, [draftState?.availablePool, searchTerm, colorFilter]);
+
+        return pool.sort((a, b) => {
+          if (sortBy === "NAME") return a.name.localeCompare(b.name);
+          if (sortBy === "CMC_ASC") return a.cmc - b.cmc || a.name.localeCompare(b.name);
+          if (sortBy === "CMC_DESC") return b.cmc - a.cmc || a.name.localeCompare(b.name);
+          if (sortBy === "COLOR") return (a.colors[0] || "Z").localeCompare(b.colors[0] || "Z") || a.name.localeCompare(b.name);
+          return 0;
+        });
+      }, [draftState?.availablePool, searchTerm, colorFilter, sortBy]);
 
       const activeSeat = draftState && !draftState.isFinished ? draftState.pickSequence[draftState.currentPickIndex] : null;
       const activePlayer = activeSeat !== null ? draftState.players[activeSeat] : null;
       const isMyTurn = mySeat !== null && mySeat === activeSeat;
 
       return (
-        <div className="max-w-7xl mx-auto p-4 md:p-6 min-h-screen flex flex-col">
-          {/* Shandalar Fantasy Header */}
-          <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 pb-4 border-b-2 border-amber-800/60">
+        <div className="max-w-7xl mx-auto p-4 md:p-6 min-h-screen flex flex-col relative">
+          
+          {/* MANDATORY SEAT SELECTION MODAL */}
+          {draftState && !hasChosenSeat && (
+            <div className="fixed inset-0 bg-slate-950/90 z-50 flex items-center justify-center p-4 backdrop-blur-md">
+              <div className="bg-parchment rounded-2xl p-6 md:p-8 max-w-lg w-full text-center relative shadow-2xl">
+                <div className="w-14 h-14 rounded-full bg-amber-900 border-2 border-amber-600 mx-auto mb-3 flex items-center justify-center text-amber-300 shadow-inner">
+                  <UserIcon />
+                </div>
+                <h2 className="text-2xl font-black font-shandalar text-amber-950 gold-text-glow mb-1">
+                  Identify Your Seat
+                </h2>
+                <p className="text-xs font-parchment text-amber-900/80 mb-6">
+                  Select your assigned drafter seat to claim your spellbook & draft queue.
+                </p>
+
+                <div className="grid grid-cols-2 gap-2.5 mb-6 max-h-60 overflow-y-auto pr-1 custom-scroll">
+                  {draftState.players.map((p, idx) => (
+                    <button
+                      key={p.id}
+                      onClick={() => {
+                        setMySeat(idx);
+                        setHasChosenSeat(true);
+                      }}
+                      className="p-3 rounded-xl bg-amber-950/90 border border-amber-700/80 hover:border-amber-400 text-amber-100 font-bold text-xs flex items-center justify-between transition hover:-translate-y-0.5 shadow"
+                    >
+                      <span className="truncate">{p.name}</span>
+                      <span className="text-[10px] text-amber-400 font-mono">Seat {idx + 1}</span>
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  onClick={() => {
+                    setMySeat(null);
+                    setHasChosenSeat(true);
+                  }}
+                  className="w-full py-2 bg-amber-900 hover:bg-amber-800 text-amber-100 font-bold text-xs rounded-xl border border-amber-700 transition"
+                >
+                  Enter as Spectator (Observer Mode)
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Header */}
+          <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 pb-4 border-b-2 border-amber-900/60">
             <div>
-              <h1 className="text-3xl font-black font-shandalar text-amber-400 gold-text-glow flex items-center gap-2">
-                <Sparkles className="w-7 h-7 text-amber-500" /> Shandalar Rotisserie Draft
-              </h1>
+              <div className="flex items-center gap-2">
+                <h1 className="text-3xl font-black font-shandalar text-amber-400 gold-text-glow flex items-center gap-2">
+                  <SparklesIcon /> Shandalar Rotisserie
+                </h1>
+                
+                <div className="hidden sm:flex items-center gap-1 ml-2">
+                  <span className="mana-orb mana-w">W</span>
+                  <span className="mana-orb mana-u">U</span>
+                  <span className="mana-orb mana-b">B</span>
+                  <span className="mana-orb mana-r">R</span>
+                  <span className="mana-orb mana-g">G</span>
+                </div>
+              </div>
               <p className="text-xs font-parchment text-amber-200/70 mt-1">Asynchronous Open Pool Magic Drafting</p>
             </div>
 
@@ -375,32 +601,44 @@
               <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
                 <button
                   onClick={copyShareableLink}
-                  className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold rounded-lg text-xs flex items-center gap-1.5 transition shadow-lg"
+                  className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold rounded-lg text-xs transition shadow-lg flex items-center gap-1"
                 >
-                  {copiedLink ? <Check className="w-4 h-4"/> : <Copy className="w-4 h-4"/>}
-                  {copiedLink ? "Link Copied!" : "Share State Link"}
+                  {copiedLink ? "✓ Short Link Copied!" : "Share State Link"}
+                </button>
+
+                <button
+                  onClick={() => setShowLogDrawer(!showLogDrawer)}
+                  className="px-3 py-1.5 bg-amber-950/80 text-amber-300 rounded-lg border border-amber-800/60 hover:bg-amber-900 text-xs flex items-center gap-1 font-semibold"
+                >
+                  <ScrollIcon /> Draft Log ({draftState.pickLog.length})
+                </button>
+
+                <button
+                  onClick={() => setHasChosenSeat(false)}
+                  className="px-3 py-1.5 bg-slate-800 text-amber-300 rounded-lg border border-amber-900/60 hover:bg-slate-700 text-xs flex items-center gap-1 font-semibold"
+                >
+                  <UserIcon /> Seat: {mySeat !== null ? draftState.players[mySeat].name : "Spectator"}
                 </button>
 
                 <button 
                   onClick={() => { setDraftState(null); window.location.hash = ""; }} 
-                  className="px-3 py-1.5 bg-rose-950/80 text-rose-300 rounded-lg border border-rose-800/60 hover:bg-rose-900 text-xs flex items-center gap-1"
+                  className="px-3 py-1.5 bg-rose-950/80 text-rose-300 rounded-lg border border-rose-800/60 hover:bg-rose-900 text-xs"
                 >
-                  <RefreshCw className="w-3.5 h-3.5"/> Reset
+                  Reset
                 </button>
               </div>
             )}
           </header>
 
-          {/* SETUP SCREEN */}
           {!draftState ? (
+            /* SETUP DASHBOARD */
             <div className="grid lg:grid-cols-12 gap-6 my-auto">
-              {/* CSV Drag & Drop Zone */}
-              <div className="lg:col-span-7 bg-slate-950/80 p-6 rounded-2xl gold-border shadow-2xl flex flex-col justify-between backdrop-blur">
+              <div className="lg:col-span-6 bg-slate-950/80 p-6 rounded-2xl gold-border shadow-2xl flex flex-col justify-between backdrop-blur">
                 <div>
                   <h2 className="text-lg font-bold font-shandalar mb-2 text-amber-400 flex items-center gap-2">
-                    <Upload className="w-5 h-5 text-amber-500"/> 1. Upload Cube (CSV)
+                    1. Upload Cube (CSV)
                   </h2>
-                  <p className="text-xs text-amber-200/60 mb-4">Upload your CubeCobra CSV file to populate the draft pool from Scryfall.</p>
+                  <p className="text-xs text-amber-200/60 mb-4">Upload your CubeCobra CSV export file to load Scryfall imagery.</p>
                   
                   <div className="border-2 border-dashed border-amber-900/60 hover:border-amber-500 bg-amber-950/20 rounded-xl p-8 text-center transition cursor-pointer relative group">
                     <input 
@@ -409,31 +647,29 @@
                       onChange={(e) => handleCsvUpload(e.target.files[0])}
                       className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" 
                     />
-                    <Upload className="w-10 h-10 mx-auto mb-3 text-amber-700 group-hover:text-amber-400 transition" />
-                    <span className="text-sm font-semibold text-amber-200 block">
-                      {isLoading ? "Fetching cards from Scryfall API..." : "Drop Cube CSV file here or click to browse"}
+                    <UploadIcon />
+                    <span className="text-sm font-semibold text-amber-200 block mt-2">
+                      {isLoading ? "Fetching cards from Scryfall..." : "Drop Cube CSV file here or click to browse"}
                     </span>
                   </div>
                 </div>
 
                 {parsedPool.length > 0 && (
                   <div className="mt-6 p-4 bg-emerald-950/40 border border-emerald-800/50 rounded-xl flex items-center justify-between text-sm text-emerald-300">
-                    <span className="flex items-center gap-2 font-semibold">
-                      ✓ Pool Ready: {parsedPool.length} Cards Loaded
+                    <span className="font-semibold">
+                      ✓ Pool Loaded: {parsedPool.length} Cards Ready
                     </span>
                   </div>
                 )}
               </div>
 
-              {/* Compact Settings Panel */}
-              <div className="lg:col-span-5 bg-slate-950/80 p-6 rounded-2xl gold-border shadow-2xl flex flex-col justify-between backdrop-blur">
+              <div className="lg:col-span-6 bg-slate-950/80 p-6 rounded-2xl gold-border shadow-2xl flex flex-col justify-between backdrop-blur">
                 <div>
-                  <h2 className="text-lg font-bold font-shandalar mb-4 text-amber-400 flex items-center gap-2">
-                    <Settings className="w-5 h-5 text-amber-500"/> 2. Draft Rules Setup
+                  <h2 className="text-lg font-bold font-shandalar mb-4 text-amber-400">
+                    2. Draft Rules Setup
                   </h2>
 
                   <div className="space-y-4 text-xs">
-                    {/* Seats Slider */}
                     <div>
                       <label className="block text-amber-300/80 mb-1 font-bold">Number of Drafters: {numPlayers}</label>
                       <input 
@@ -444,32 +680,41 @@
                       />
                     </div>
 
-                    {/* Total Draft Cap & Double Pick Threshold */}
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-amber-300/80 mb-1 font-bold">Total Picks Cap</label>
-                        <input 
-                          type="number" min="10" max={parsedPool.length || 1000}
-                          value={totalDraftCap} 
-                          onChange={e => setTotalDraftCap(parseInt(e.target.value) || 1)}
-                          className="w-full bg-slate-900 border border-amber-900/60 rounded p-2 text-amber-100 font-bold focus:border-amber-400 outline-none"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-amber-300/80 mb-1 font-bold">Double Picks Start</label>
-                        <input 
-                          type="number" min="1" max={totalDraftCap}
-                          value={doublePickThreshold} 
-                          onChange={e => setDoublePickThreshold(parseInt(e.target.value) || 1)}
-                          className="w-full bg-slate-900 border border-amber-900/60 rounded p-2 text-amber-100 font-bold focus:border-amber-400 outline-none"
-                        />
-                      </div>
+                    <div>
+                      <label className="block text-amber-300/80 mb-1 font-bold">Draft Pool Size Preset</label>
+                      <select 
+                        value={packPreset}
+                        onChange={e => setPackPreset(e.target.value)}
+                        className="w-full bg-slate-900 border border-amber-900/60 rounded p-2 text-amber-100 font-bold outline-none focus:border-amber-400"
+                      >
+                        <option value="3x15">Standard 3 Packs of 15 (45 cards / player)</option>
+                        <option value="4x11">4 Packs of 11 (44 cards / player)</option>
+                        <option value="4x15">4 Packs of 15 (60 cards / player)</option>
+                        <option value="FULL">Draft Entire Cube Pool ({parsedPool.length} cards)</option>
+                      </select>
+                      <span className="text-[10px] text-amber-500/80 mt-1 block">
+                        Total picks allowed: <strong>{calculatedTotalCap} cards</strong>
+                      </span>
                     </div>
 
-                    {/* Seat Names */}
+                    <div>
+                      <label className="block text-amber-300/80 mb-1 font-bold">Enable Double Picks After Pick #</label>
+                      <select 
+                        value={doublePickStart}
+                        onChange={e => setDoublePickStart(parseInt(e.target.value))}
+                        className="w-full bg-slate-900 border border-amber-900/60 rounded p-2 text-amber-100 font-bold outline-none focus:border-amber-400"
+                      >
+                        <option value={0}>Never (Single picks for entire draft)</option>
+                        <option value={10}>After Pick 10</option>
+                        <option value={20}>After Pick 20</option>
+                        <option value={30}>After Pick 30</option>
+                        <option value={40}>After Pick 40</option>
+                      </select>
+                    </div>
+
                     <div>
                       <label className="block text-amber-300/80 mb-1 font-bold">Drafter Names</label>
-                      <div className="grid grid-cols-2 gap-1.5 max-h-32 overflow-y-auto pr-1">
+                      <div className="grid grid-cols-2 gap-1.5 max-h-28 overflow-y-auto pr-1 custom-scroll">
                         {playerNames.map((name, idx) => (
                           <input
                             key={idx}
@@ -492,22 +737,19 @@
                 <button 
                   onClick={startDraft}
                   disabled={parsedPool.length === 0}
-                  className="w-full mt-6 py-3 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-slate-950 font-black font-shandalar rounded-xl shadow-lg transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm"
+                  className="w-full mt-6 py-3 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-slate-950 font-black font-shandalar rounded-xl shadow-lg transition disabled:opacity-40 disabled:cursor-not-allowed text-sm"
                 >
-                  <Play className="w-5 h-5 fill-current"/> Launch Rotisserie Session
+                  Launch Rotisserie Session ({calculatedTotalCap} Picks)
                 </button>
               </div>
             </div>
           ) : (
-            /* ACTIVE DRAFT VIEW */
+            /* ACTIVE SESSION VIEW */
             <div className="flex-1 flex flex-col gap-6">
-              {/* Top Banner: Turn Control & Seat Selector */}
               <div className="bg-slate-950/90 border-2 border-amber-800/80 rounded-2xl p-4 shadow-2xl backdrop-blur">
                 <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-amber-900/50 pb-4 mb-4">
-                  
-                  {/* Current Turn Status */}
                   <div className="flex items-center gap-3">
-                    <div className="w-3 h-3 rounded-full bg-amber-500 animate-pulse"></div>
+                    <div className="w-3.5 h-3.5 rounded-full bg-amber-500 animate-pulse shadow-lg"></div>
                     <div>
                       <span className="text-[10px] font-bold text-amber-500 uppercase tracking-widest block font-shandalar">Active Drafter</span>
                       {!draftState.isFinished ? (
@@ -516,9 +758,9 @@
                           <span className="text-xs bg-amber-950 border border-amber-700/60 px-2 py-0.5 rounded text-amber-400 font-normal">
                             Pick {draftState.currentPickIndex + 1} / {draftState.totalCap}
                           </span>
-                          {draftState.currentPickIndex + 1 >= draftState.doublePickStart && (
-                            <span className="text-[10px] bg-indigo-950 text-indigo-300 border border-indigo-700 px-2 py-0.5 rounded font-bold flex items-center gap-1">
-                              <Zap className="w-3 h-3 fill-current"/> Double Pick Active
+                          {draftState.doublePickStart > 0 && (draftState.currentPickIndex + 1) > draftState.doublePickStart && (
+                            <span className="text-[10px] bg-indigo-950 text-indigo-300 border border-indigo-700 px-2 py-0.5 rounded font-bold">
+                              ⚡ Double Pick Active
                             </span>
                           )}
                         </div>
@@ -530,49 +772,24 @@
                     </div>
                   </div>
 
-                  {/* Seat Login / Spectator Switcher */}
-                  <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto pb-1">
-                    <span className="text-xs font-bold text-amber-400 shrink-0 font-shandalar">Your Seat:</span>
-                    <button
-                      onClick={() => setMySeat(null)}
-                      className={`px-3 py-1 rounded-lg text-xs font-semibold transition ${
-                        mySeat === null 
-                          ? "bg-amber-500 text-slate-950 font-bold" 
-                          : "bg-slate-900 text-amber-200/70 border border-amber-900/40 hover:bg-slate-800"
-                      }`}
-                    >
-                      Spectator
-                    </button>
-                    {draftState.players.map((p, idx) => (
-                      <button
-                        key={p.id}
-                        onClick={() => setMySeat(idx)}
-                        className={`px-3 py-1 rounded-lg text-xs font-semibold transition whitespace-nowrap ${
-                          mySeat === idx 
-                            ? "bg-amber-500 text-slate-950 font-bold shadow-md" 
-                            : "bg-slate-900 text-amber-200/70 border border-amber-900/40 hover:bg-slate-800"
-                        }`}
-                      >
-                        {p.name}
-                      </button>
-                    ))}
+                  <div className="text-xs text-amber-400 font-bold bg-slate-900 border border-amber-900/50 px-3 py-1.5 rounded-lg flex items-center gap-2">
+                    <UserIcon /> Active Seat: <span className="text-amber-200">{mySeat !== null ? draftState.players[mySeat].name : "Spectator Mode"}</span>
                   </div>
                 </div>
 
-                {/* Queue & Auto-Draft Controls for Current Seat */}
                 {mySeat !== null && (
                   <div className="flex flex-wrap items-center justify-between gap-3 bg-amber-950/20 p-3 rounded-xl border border-amber-900/40">
                     <div className="flex items-center gap-3">
                       <span className="text-xs font-bold text-amber-300 font-shandalar">Seat Controls ({draftState.players[mySeat].name}):</span>
                       <button
                         onClick={toggleAutoDraft}
-                        className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 transition ${
+                        className={`px-3 py-1 rounded-full text-xs font-bold transition ${
                           draftState.players[mySeat].autoDraft 
                             ? "bg-emerald-500 text-slate-950 shadow-lg" 
                             : "bg-slate-900 text-slate-400 border border-slate-700"
                         }`}
                       >
-                        <Zap className="w-3.5 h-3.5 fill-current"/> Auto-Draft: {draftState.players[mySeat].autoDraft ? "ON" : "OFF"}
+                        Auto-Draft: {draftState.players[mySeat].autoDraft ? "ON" : "OFF"}
                       </button>
                     </div>
 
@@ -583,28 +800,28 @@
                 )}
               </div>
 
-              {/* Sub-Navigation Tabs */}
-              <div className="flex items-center justify-between border-b border-amber-900/50 pb-2">
+              {/* Sub-Nav Toolbar */}
+              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 border-b border-amber-900/50 pb-3">
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => setViewTab("pool")}
-                    className={`px-4 py-2 rounded-xl text-xs font-bold font-shandalar transition ${
+                    className={`px-4 py-1.5 rounded-xl text-xs font-bold font-shandalar transition ${
                       viewTab === "pool" ? "bg-amber-500 text-slate-950" : "bg-slate-900 text-amber-300 hover:bg-slate-800"
                     }`}
                   >
-                    Open Card Pool ({filteredPool.length})
+                    Open Pool ({filteredPool.length})
                   </button>
                   <button
                     onClick={() => setViewTab("queues")}
-                    className={`px-4 py-2 rounded-xl text-xs font-bold font-shandalar transition ${
+                    className={`px-4 py-1.5 rounded-xl text-xs font-bold font-shandalar transition ${
                       viewTab === "queues" ? "bg-amber-500 text-slate-950" : "bg-slate-900 text-amber-300 hover:bg-slate-800"
                     }`}
                   >
-                    Drafter Queues
+                    Queues
                   </button>
                   <button
                     onClick={() => setViewTab("pools")}
-                    className={`px-4 py-2 rounded-xl text-xs font-bold font-shandalar transition ${
+                    className={`px-4 py-1.5 rounded-xl text-xs font-bold font-shandalar transition ${
                       viewTab === "pools" ? "bg-amber-500 text-slate-950" : "bg-slate-900 text-amber-300 hover:bg-slate-800"
                     }`}
                   >
@@ -612,20 +829,42 @@
                   </button>
                 </div>
 
-                {/* Filters for Main Card Pool */}
                 {viewTab === "pool" && (
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      placeholder="Search card..."
-                      value={searchTerm}
-                      onChange={e => setSearchTerm(e.target.value)}
-                      className="bg-slate-950 border border-amber-900/60 rounded-lg px-2.5 py-1 text-xs text-amber-100 placeholder-amber-700 focus:border-amber-400 outline-none"
-                    />
+                  <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+                    <div className="flex border border-amber-900/60 rounded-lg overflow-hidden bg-slate-950">
+                      <button
+                        onClick={() => setDisplayStyle("GRID")}
+                        className={`px-2.5 py-1 text-xs font-bold transition ${
+                          displayStyle === "GRID" ? "bg-amber-600 text-slate-950" : "text-amber-300 hover:bg-slate-800"
+                        }`}
+                      >
+                        Grid
+                      </button>
+                      <button
+                        onClick={() => setDisplayStyle("LIST")}
+                        className={`px-2.5 py-1 text-xs font-bold transition ${
+                          displayStyle === "LIST" ? "bg-amber-600 text-slate-950" : "text-amber-300 hover:bg-slate-800"
+                        }`}
+                      >
+                        List
+                      </button>
+                    </div>
+
+                    <select
+                      value={sortBy}
+                      onChange={e => setSortBy(e.target.value)}
+                      className="bg-slate-950 border border-amber-900/60 rounded-lg px-2 py-1 text-xs text-amber-300 font-bold focus:border-amber-400 outline-none"
+                    >
+                      <option value="NAME">Sort: Name (A-Z)</option>
+                      <option value="CMC_ASC">Sort: Mana Value (Low-High)</option>
+                      <option value="CMC_DESC">Sort: Mana Value (High-Low)</option>
+                      <option value="COLOR">Sort: Color</option>
+                    </select>
+
                     <select
                       value={colorFilter}
                       onChange={e => setColorFilter(e.target.value)}
-                      className="bg-slate-950 border border-amber-900/60 rounded-lg px-2 py-1 text-xs text-amber-300 focus:border-amber-400 outline-none font-bold"
+                      className="bg-slate-950 border border-amber-900/60 rounded-lg px-2 py-1 text-xs text-amber-300 font-bold focus:border-amber-400 outline-none"
                     >
                       <option value="ALL">All Colors</option>
                       <option value="W">White</option>
@@ -633,109 +872,189 @@
                       <option value="B">Black</option>
                       <option value="R">Red</option>
                       <option value="G">Green</option>
+                      <option value="M">Multicolor</option>
                       <option value="C">Colorless</option>
                     </select>
+
+                    <input
+                      type="text"
+                      placeholder="Search card..."
+                      value={searchTerm}
+                      onChange={e => setSearchTerm(e.target.value)}
+                      className="bg-slate-950 border border-amber-900/60 rounded-lg px-2.5 py-1 text-xs text-amber-100 focus:border-amber-400 outline-none"
+                    />
                   </div>
                 )}
               </div>
 
-              {/* TAB 1: MAIN ROTISSERIE OPEN POOL */}
+              {/* TAB 1: OPEN POOL */}
               {viewTab === "pool" && (
                 <div className="flex-1">
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                    {filteredPool.map(card => {
-                      const isQueued = mySeat !== null && draftState.players[mySeat].queue.includes(card.uniqueId);
+                  {displayStyle === "GRID" ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                      {filteredPool.map(card => {
+                        const isQueued = mySeat !== null && draftState.players[mySeat].queue.includes(card.uniqueId);
 
-                      return (
-                        <div
-                          key={card.uniqueId}
-                          className={`group relative rounded-xl overflow-hidden border bg-slate-950 transition shadow-xl ${
-                            isQueued ? "border-emerald-400 ring-2 ring-emerald-400/50" : "border-amber-900/60 hover:border-amber-400"
-                          }`}
-                        >
-                          <img 
-                            src={card.image} 
-                            alt={card.name} 
-                            className="w-full h-auto object-cover"
-                            loading="lazy"
-                          />
+                        return (
+                          <div
+                            key={card.uniqueId}
+                            className={`group relative rounded-xl overflow-hidden border bg-slate-950 transition shadow-xl ${
+                              isQueued ? "border-emerald-400 ring-2 ring-emerald-400/50" : "border-amber-900/60 hover:border-amber-400"
+                            }`}
+                          >
+                            <img 
+                              src={card.image} 
+                              alt={card.name} 
+                              className="w-full h-auto object-cover"
+                              loading="lazy"
+                            />
 
-                          {/* Hover Actions */}
-                          <div className="absolute inset-0 bg-slate-950/85 opacity-0 group-hover:opacity-100 transition p-3 flex flex-col justify-end items-center gap-2 text-center">
-                            <span className="text-xs font-bold text-amber-300 leading-tight">{card.name}</span>
-
-                            {isMyTurn && (
-                              <button
-                                onClick={() => executePick(card, mySeat)}
-                                className="w-full py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-lg shadow font-shandalar"
+                            <div className="absolute inset-0 bg-slate-950/85 opacity-0 group-hover:opacity-100 transition p-3 flex flex-col justify-end items-center gap-2 text-center">
+                              <span className="text-xs font-bold text-amber-300 leading-tight">{card.name}</span>
+                              
+                              <a
+                                href={card.scryfallUri}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-[10px] text-amber-400/80 hover:text-amber-200 flex items-center gap-1 font-semibold underline"
                               >
-                                Draft Card
-                              </button>
-                            )}
+                                Scryfall Rules <ExternalLinkIcon />
+                              </a>
 
-                            {mySeat !== null && (
-                              <button
-                                onClick={() => toggleQueue(card.uniqueId)}
-                                className={`w-full py-1 text-[11px] font-bold rounded-lg transition ${
-                                  isQueued 
-                                    ? "bg-rose-900/80 text-rose-200 border border-rose-700" 
-                                    : "bg-emerald-950/80 text-emerald-300 border border-emerald-700 hover:bg-emerald-900"
-                                }`}
-                              >
-                                {isQueued ? "Remove Queue" : "+ Add to Queue"}
-                              </button>
-                            )}
-                          </div>
+                              {isMyTurn && (
+                                <button
+                                  onClick={() => executePick(card, mySeat)}
+                                  className="w-full py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-lg font-shandalar"
+                                >
+                                  Draft Card
+                                </button>
+                              )}
 
-                          {/* Queue Badge Indicator */}
-                          {isQueued && (
-                            <div className="absolute top-2 right-2 bg-emerald-500 text-slate-950 p-1 rounded-full shadow">
-                              <BookmarkPlus className="w-3.5 h-3.5 fill-current"/>
+                              {mySeat !== null && (
+                                <button
+                                  onClick={() => toggleQueue(card.uniqueId)}
+                                  className={`w-full py-1 text-[11px] font-bold rounded-lg transition ${
+                                    isQueued 
+                                      ? "bg-rose-900/80 text-rose-200 border border-rose-700" 
+                                      : "bg-emerald-950/80 text-emerald-300 border border-emerald-700 hover:bg-emerald-900"
+                                  }`}
+                                >
+                                  {isQueued ? "Remove Queue" : "+ Add Queue"}
+                                </button>
+                              )}
                             </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="bg-slate-950/80 border border-amber-900/60 rounded-xl overflow-hidden divide-y divide-amber-900/40">
+                      {filteredPool.map(card => {
+                        const isQueued = mySeat !== null && draftState.players[mySeat].queue.includes(card.uniqueId);
+
+                        return (
+                          <div 
+                            key={card.uniqueId} 
+                            className={`p-2.5 flex items-center justify-between hover:bg-amber-950/30 transition text-xs ${
+                              isQueued ? "bg-emerald-950/20" : ""
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <span className="w-6 text-center font-bold text-amber-500 font-mono">{card.cmc}</span>
+                              <span className="font-bold text-amber-100">{card.name}</span>
+                              <span className="text-[10px] text-amber-400/70">{card.type}</span>
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                              <a
+                                href={card.scryfallUri}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-[11px] text-amber-400/80 hover:text-amber-200 flex items-center gap-1 font-semibold"
+                              >
+                                View Scryfall <ExternalLinkIcon />
+                              </a>
+
+                              {isMyTurn && (
+                                <button
+                                  onClick={() => executePick(card, mySeat)}
+                                  className="px-3 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded font-shandalar"
+                                >
+                                  Draft
+                                </button>
+                              )}
+
+                              {mySeat !== null && (
+                                <button
+                                  onClick={() => toggleQueue(card.uniqueId)}
+                                  className={`px-2.5 py-1 text-[10px] font-bold rounded transition ${
+                                    isQueued 
+                                      ? "bg-rose-900/80 text-rose-200 border border-rose-700" 
+                                      : "bg-emerald-950/80 text-emerald-300 border border-emerald-700"
+                                  }`}
+                                >
+                                  {isQueued ? "Remove Queue" : "+ Queue"}
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               )}
 
-              {/* TAB 2: DRAFTER QUEUES */}
+              {/* TAB 2: PRIVATE QUEUES */}
               {viewTab === "queues" && (
                 <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {draftState.players.map(player => (
-                    <div key={player.id} className="bg-slate-950/80 border border-amber-900/60 rounded-xl p-4 flex flex-col">
-                      <div className="flex items-center justify-between border-b border-amber-900/40 pb-2 mb-3">
-                        <span className="font-bold text-amber-300 font-shandalar text-sm">{player.name}</span>
-                        {player.autoDraft && (
-                          <span className="text-[10px] bg-emerald-950 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-700 font-bold">
-                            Auto-Draft ON
-                          </span>
-                        )}
-                      </div>
+                  {draftState.players.map(player => {
+                    const isMyQueue = mySeat === player.id;
 
-                      <div className="space-y-2 flex-1 overflow-y-auto max-h-[60vh] pr-1">
-                        {player.queue.length > 0 ? (
-                          player.queue.map((cardId, index) => {
-                            const card = draftState.availablePool.find(c => c.uniqueId === cardId);
-                            if (!card) return null;
-                            return (
-                              <div key={cardId} className="flex items-center justify-between bg-slate-900 p-2 rounded border border-amber-900/30 text-xs">
-                                <span className="text-amber-200 truncate font-medium">{index + 1}. {card.name}</span>
-                                {mySeat === player.id && (
-                                  <button onClick={() => toggleQueue(cardId)} className="text-rose-400 hover:text-rose-300 font-bold ml-2">
-                                    ×
-                                  </button>
-                                )}
-                              </div>
-                            );
-                          })
+                    return (
+                      <div key={player.id} className="bg-slate-950/80 border border-amber-900/60 rounded-xl p-4 flex flex-col min-h-[300px]">
+                        <div className="flex items-center justify-between border-b border-amber-900/40 pb-2 mb-3">
+                          <span className="font-bold text-amber-300 font-shandalar text-sm">{player.name}</span>
+                          {isMyQueue && player.autoDraft && (
+                            <span className="text-[10px] bg-emerald-950 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-700 font-bold">
+                              Auto-Draft ON
+                            </span>
+                          )}
+                        </div>
+
+                        {isMyQueue ? (
+                          /* Visible Personal Queue */
+                          <div className="space-y-2 flex-1 overflow-y-auto max-h-[60vh] pr-1 custom-scroll">
+                            {player.queue.length > 0 ? (
+                              player.queue.map((cardId, index) => {
+                                const card = draftState.availablePool.find(c => c.uniqueId === cardId);
+                                if (!card) return null;
+                                return (
+                                  <div key={cardId} className="flex items-center justify-between bg-slate-900 p-2 rounded border border-amber-900/30 text-xs">
+                                    <span className="text-amber-200 truncate font-medium">{index + 1}. {card.name}</span>
+                                    <button onClick={() => toggleQueue(cardId)} className="text-rose-400 hover:text-rose-300 font-bold ml-2">
+                                      ×
+                                    </button>
+                                  </div>
+                                );
+                              })
+                            ) : (
+                              <span className="text-xs text-amber-700 italic">No cards in queue. Add cards from the Open Pool.</span>
+                            )}
+                          </div>
                         ) : (
-                          <span className="text-xs text-amber-700 italic">No cards in queue.</span>
+                          /* Obscured Opponent Queue */
+                          <div className="flex-1 flex flex-col items-center justify-center p-6 text-center border border-dashed border-amber-900/40 rounded-xl bg-slate-900/40">
+                            <LockIcon />
+                            <span className="text-xs font-bold text-amber-400 font-shandalar block mt-1">Secret Queue</span>
+                            <span className="text-[11px] text-amber-200/50 mt-1 block">
+                              {player.queue.length} card{player.queue.length === 1 ? '' : 's'} queued
+                            </span>
+                          </div>
                         )}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
 
@@ -749,7 +1068,7 @@
                         <span className="text-xs text-amber-500 font-bold">{player.pool.length} Cards</span>
                       </div>
 
-                      <div className="space-y-1.5 flex-1 overflow-y-auto max-h-[60vh] pr-1">
+                      <div className="space-y-1.5 flex-1 overflow-y-auto max-h-[60vh] pr-1 custom-scroll">
                         {player.pool.map((card, idx) => (
                           <div key={card.uniqueId} className="flex items-center justify-between bg-slate-900/80 px-2 py-1 rounded text-xs text-amber-100">
                             <span className="truncate">{idx + 1}. {card.name}</span>
@@ -759,6 +1078,29 @@
                       </div>
                     </div>
                   ))}
+                </div>
+              )}
+
+              {/* FLOATING DRAWER: DRAFT LOG SCROLL */}
+              {showLogDrawer && (
+                <div className="fixed bottom-4 right-4 z-40 max-w-sm w-full bg-parchment rounded-2xl p-4 shadow-2xl border-2 border-amber-800">
+                  <div className="flex items-center justify-between border-b border-amber-900/40 pb-2 mb-2">
+                    <span className="font-black font-shandalar text-amber-950 text-sm flex items-center gap-1.5">
+                      <ScrollIcon /> Scroll of Draft Records
+                    </span>
+                    <button onClick={() => setShowLogDrawer(false)} className="text-amber-950 font-bold hover:text-amber-800 text-sm">
+                      ×
+                    </button>
+                  </div>
+
+                  <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1 text-xs font-parchment text-amber-950 custom-scroll">
+                    {draftState.pickLog.map((log, i) => (
+                      <div key={i} className="flex items-center justify-between border-b border-amber-900/20 pb-1">
+                        <span>Pick #{log.pick}: <strong>{log.player}</strong></span>
+                        <span className="font-bold text-amber-900">{log.card}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
