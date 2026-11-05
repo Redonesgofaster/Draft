@@ -77,15 +77,14 @@
     import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
     // PASTE YOUR FIREBASE CONFIG HERE
-   const firebaseConfig = {
-  apiKey: "AIzaSyDcBbijNZxkEEbvRaf6fUXrGd8yIagDqLM",
-  authDomain: "draft-6cadc.firebaseapp.com",
-  projectId: "draft-6cadc",
-  storageBucket: "draft-6cadc.firebasestorage.app",
-  messagingSenderId: "185016725869",
-  appId: "1:185016725869:web:db7402ddcfa8e9d3abaa64",
-  measurementId: "G-NZMZTSHD8D"
-};
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_PROJECT_ID.appspot.com",
+      messagingSenderId: "YOUR_SENDER_ID",
+      appId: "YOUR_APP_ID"
+    };
 
     const app = initializeApp(firebaseConfig);
     window.db = getFirestore(app);
@@ -343,7 +342,6 @@
       const [showLogDrawer, setShowLogDrawer] = useState(false);
       const [activeMobilePopoverCardId, setActiveMobilePopoverCardId] = useState(null);
       
-      // PICK CONFIRMATION MODAL STATE
       const [pendingPickCard, setPendingPickCard] = useState(null);
 
       const [searchTerm, setSearchTerm] = useState("");
@@ -357,39 +355,56 @@
         draftStateRef.current = draftState;
       }, [draftState]);
 
-      // Realtime Firebase Listener on Room Code Hash
+      // Hash Listener & Dynamic LocalStorage Seat Recovery
       useEffect(() => {
-        const hash = window.location.hash.replace("#", "").trim();
-        if (hash.length > 0 && window.db) {
-          setRoomId(hash);
+        const updateFromHash = () => {
+          const hash = window.location.hash.replace("#", "").trim();
+          if (hash.length > 0 && window.db) {
+            setRoomId(hash);
 
-          // Check LocalStorage for previously saved seat for this room ID
-          const savedSeat = localStorage.getItem(`shandalar_seat_${hash}`);
-          if (savedSeat !== null) {
-            const seatNum = parseInt(savedSeat, 10);
-            if (!isNaN(seatNum)) {
-              setMySeat(seatNum);
-              setHasChosenSeat(true);
+            // Read LocalStorage for saved seat corresponding to this specific room ID
+            const savedSeat = localStorage.getItem(`shandalar_seat_${hash}`);
+            if (savedSeat !== null && savedSeat !== "") {
+              const parsedSeat = parseInt(savedSeat, 10);
+              if (!isNaN(parsedSeat)) {
+                setMySeat(parsedSeat);
+                setHasChosenSeat(true);
+              }
+            } else {
+              setHasChosenSeat(false);
+              setMySeat(null);
             }
+
+            const { doc, onSnapshot } = window.firestoreTools;
+            const unsub = onSnapshot(doc(window.db, "drafts", hash), (docSnap) => {
+              if (docSnap.exists()) {
+                const data = docSnap.data();
+                setDraftState(data);
+              }
+            });
+            return unsub;
           }
+        };
 
-          const { doc, onSnapshot } = window.firestoreTools;
-          const unsub = onSnapshot(doc(window.db, "drafts", hash), (docSnap) => {
-            if (docSnap.exists()) {
-              const data = docSnap.data();
-              setDraftState(data);
-            }
-          });
-          return () => unsub();
-        }
-      }, [window.db, window.location.hash]);
+        const unsubFn = updateFromHash();
+        window.addEventListener("hashchange", updateFromHash);
+        return () => {
+          if (unsubFn) unsubFn();
+          window.removeEventListener("hashchange", updateFromHash);
+        };
+      }, [window.db]);
 
-      // Save seat selection to localStorage whenever seat is assigned
+      // Assign and persist seat selection to localStorage
       const chooseSeat = (seatIndex) => {
         setMySeat(seatIndex);
         setHasChosenSeat(true);
-        if (roomId && seatIndex !== null) {
-          localStorage.setItem(`shandalar_seat_${roomId}`, seatIndex.toString());
+        const activeRoom = roomId || window.location.hash.replace("#", "").trim();
+        if (activeRoom) {
+          if (seatIndex !== null) {
+            localStorage.setItem(`shandalar_seat_${activeRoom}`, seatIndex.toString());
+          } else {
+            localStorage.removeItem(`shandalar_seat_${activeRoom}`);
+          }
         }
       };
 
@@ -414,6 +429,7 @@
           const activeSeat = draftState.pickSequence[draftState.currentPickIndex];
           const activePlayer = draftState.players[activeSeat];
 
+          // Re-validate that queued card is STILL present in availablePool before drafting
           if (activePlayer && activePlayer.autoDraft && activePlayer.queue.length > 0) {
             const topQueuedId = activePlayer.queue.find(id => 
               draftState.availablePool.some(c => c.uniqueId === id)
@@ -519,7 +535,7 @@
         }
 
         setDraftState(newSession);
-        setHasChosenSeat(false);
+        chooseSeat(0); // Host defaults to Seat 1
       };
 
       const syncStateToFirestore = async (newState) => {
@@ -529,20 +545,40 @@
         }
       };
 
+      // Atomic Execution & Duplicate Pick Prevention
       const executePick = (card, seatIdx) => {
         const currentState = draftStateRef.current || draftState;
         if (!currentState) return;
+
         const activeSeat = currentState.pickSequence[currentState.currentPickIndex];
         if (seatIdx !== undefined && seatIdx !== activeSeat) return;
 
-        const updatedPlayers = [...currentState.players];
-        const targetPlayer = updatedPlayers[activeSeat];
+        // Atomically verify card still exists in pool to eliminate race conditions
+        const cardStillAvailable = currentState.availablePool.some(c => c.uniqueId === card.uniqueId);
+        if (!cardStillAvailable) {
+          console.warn("Card already drafted by another player:", card.name);
+          setPendingPickCard(null);
+          return;
+        }
 
-        targetPlayer.pool.push(card);
-        targetPlayer.queue = targetPlayer.queue.filter(id => id !== card.uniqueId);
+        const updatedPlayers = currentState.players.map((p, idx) => {
+          if (idx === activeSeat) {
+            return {
+              ...p,
+              pool: [...p.pool, card],
+              queue: p.queue.filter(id => id !== card.uniqueId)
+            };
+          }
+          // Remove card from all other player queues if present
+          return {
+            ...p,
+            queue: p.queue.filter(id => id !== card.uniqueId)
+          };
+        });
 
         const updatedAvailablePool = currentState.availablePool.filter(c => c.uniqueId !== card.uniqueId);
         const nextPickIndex = currentState.currentPickIndex + 1;
+        const targetPlayer = currentState.players[activeSeat];
         const newLog = [{ player: targetPlayer.name, card: card.name, pick: nextPickIndex }, ...currentState.pickLog];
 
         let nextState = {
