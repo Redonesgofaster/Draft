@@ -76,15 +76,15 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-   const firebaseConfig = {
-  apiKey: "AIzaSyDcBbijNZxkEEbvRaf6fUXrGd8yIagDqLM",
-  authDomain: "draft-6cadc.firebaseapp.com",
-  projectId: "draft-6cadc",
-  storageBucket: "draft-6cadc.firebasestorage.app",
-  messagingSenderId: "185016725869",
-  appId: "1:185016725869:web:db7402ddcfa8e9d3abaa64",
-  measurementId: "G-NZMZTSHD8D"
-};
+    // PASTE YOUR FIREBASE CONFIG HERE
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_PROJECT_ID.appspot.com",
+      messagingSenderId: "YOUR_SENDER_ID",
+      appId: "YOUR_APP_ID"
+    };
 
     const app = initializeApp(firebaseConfig);
     window.db = getFirestore(app);
@@ -92,7 +92,7 @@
   </script>
 
   <script type="text/babel">
-    const { useState, useEffect, useMemo } = React;
+    const { useState, useEffect, useMemo, useRef } = React;
 
     // SVG Graphics
     const SparklesIcon = () => (
@@ -280,6 +280,12 @@
       const [displayStyle, setDisplayStyle] = useState("GRID");
       const [viewTab, setViewTab] = useState("pool");
 
+      // Ref to store draftState for instant callback handlers
+      const draftStateRef = useRef(draftState);
+      useEffect(() => {
+        draftStateRef.current = draftState;
+      }, [draftState]);
+
       // Realtime Firebase Listener on Room Code Hash
       useEffect(() => {
         const hash = window.location.hash.replace("#", "").trim();
@@ -295,6 +301,28 @@
           return () => unsub();
         }
       }, [window.db, window.location.hash]);
+
+      // Trigger automatic turn execution whenever turn updates or autoDraft changes
+      useEffect(() => {
+        if (!draftState || draftState.isFinished) return;
+        const activeSeat = draftState.pickSequence[draftState.currentPickIndex];
+        const activePlayer = draftState.players[activeSeat];
+
+        if (activePlayer && activePlayer.autoDraft && activePlayer.queue.length > 0) {
+          const topQueuedId = activePlayer.queue.find(id => 
+            draftState.availablePool.some(c => c.uniqueId === id)
+          );
+          if (topQueuedId) {
+            const cardToPick = draftState.availablePool.find(c => c.uniqueId === topQueuedId);
+            if (cardToPick) {
+              const timer = setTimeout(() => {
+                executePick(cardToPick, activeSeat);
+              }, 100);
+              return () => clearTimeout(timer);
+            }
+          }
+        }
+      }, [draftState?.currentPickIndex, draftState?.players]);
 
       useEffect(() => {
         setPlayerNames(prev => {
@@ -394,43 +422,29 @@
       };
 
       const executePick = (card, seatIdx) => {
-        if (!draftState) return;
-        const activeSeat = draftState.pickSequence[draftState.currentPickIndex];
+        const currentState = draftStateRef.current || draftState;
+        if (!currentState) return;
+        const activeSeat = currentState.pickSequence[currentState.currentPickIndex];
         if (seatIdx !== undefined && seatIdx !== activeSeat) return;
 
-        const updatedPlayers = [...draftState.players];
+        const updatedPlayers = [...currentState.players];
         const targetPlayer = updatedPlayers[activeSeat];
 
         targetPlayer.pool.push(card);
         targetPlayer.queue = targetPlayer.queue.filter(id => id !== card.uniqueId);
 
-        const updatedAvailablePool = draftState.availablePool.filter(c => c.uniqueId !== card.uniqueId);
-        const nextPickIndex = draftState.currentPickIndex + 1;
-        const newLog = [{ player: targetPlayer.name, card: card.name, pick: nextPickIndex }, ...draftState.pickLog];
+        const updatedAvailablePool = currentState.availablePool.filter(c => c.uniqueId !== card.uniqueId);
+        const nextPickIndex = currentState.currentPickIndex + 1;
+        const newLog = [{ player: targetPlayer.name, card: card.name, pick: nextPickIndex }, ...currentState.pickLog];
 
         let nextState = {
-          ...draftState,
+          ...currentState,
           players: updatedPlayers,
           availablePool: updatedAvailablePool,
           currentPickIndex: nextPickIndex,
           pickLog: newLog,
-          isFinished: nextPickIndex >= draftState.pickSequence.length || updatedAvailablePool.length === 0
+          isFinished: nextPickIndex >= currentState.pickSequence.length || updatedAvailablePool.length === 0
         };
-
-        if (!nextState.isFinished) {
-          const nextSeat = nextState.pickSequence[nextPickIndex];
-          const nextPlayer = nextState.players[nextSeat];
-
-          if (nextPlayer.autoDraft && nextPlayer.queue.length > 0) {
-            const autoPickCardId = nextPlayer.queue.find(id => nextState.availablePool.some(c => c.uniqueId === id));
-            if (autoPickCardId) {
-              const autoCard = nextState.availablePool.find(c => c.uniqueId === autoPickCardId);
-              if (autoCard) {
-                setTimeout(() => executePick(autoCard, nextSeat), 300);
-              }
-            }
-          }
-        }
 
         setDraftState(nextState);
         syncStateToFirestore(nextState);
@@ -452,22 +466,46 @@
         syncStateToFirestore(nextState);
       };
 
+      // Queue Priority Reordering (Move Item Up or Down)
+      const moveQueuePriority = (index, direction) => {
+        if (mySeat === null || !draftState) return;
+        const updatedPlayers = [...draftState.players];
+        const queue = [...updatedPlayers[mySeat].queue];
+
+        const targetIndex = direction === "UP" ? index - 1 : index + 1;
+        if (targetIndex < 0 || targetIndex >= queue.length) return;
+
+        // Swap positions
+        const temp = queue[index];
+        queue[index] = queue[targetIndex];
+        queue[targetIndex] = temp;
+
+        updatedPlayers[mySeat].queue = queue;
+        const nextState = { ...draftState, players: updatedPlayers };
+        setDraftState(nextState);
+        syncStateToFirestore(nextState);
+      };
+
+      // Toggle Auto-Draft and immediately process pick if it is current player's turn
       const toggleAutoDraft = () => {
         if (mySeat === null || !draftState) return;
         const updatedPlayers = [...draftState.players];
         const player = updatedPlayers[mySeat];
-        player.autoDraft = !player.autoDraft;
+        const newAutoDraftState = !player.autoDraft;
+        player.autoDraft = newAutoDraftState;
 
         const nextState = { ...draftState, players: updatedPlayers };
         setDraftState(nextState);
         syncStateToFirestore(nextState);
 
         const activeSeat = nextState.pickSequence[nextState.currentPickIndex];
-        if (player.autoDraft && mySeat === activeSeat && player.queue.length > 0) {
+        if (newAutoDraftState && mySeat === activeSeat && player.queue.length > 0) {
           const topQueuedId = player.queue.find(id => nextState.availablePool.some(c => c.uniqueId === id));
           if (topQueuedId) {
-            const card = nextState.availablePool.find(c => c.uniqueId === topQueuedId);
-            if (card) executePick(card, mySeat);
+            const cardToPick = nextState.availablePool.find(c => c.uniqueId === topQueuedId);
+            if (cardToPick) {
+              executePick(cardToPick, mySeat);
+            }
           }
         }
       };
@@ -975,7 +1013,7 @@
                 </div>
               )}
 
-              {/* TAB 2: PRIVATE QUEUES */}
+              {/* TAB 2: PRIVATE QUEUES (WITH PRIORITY REORDERING) */}
               {viewTab === "queues" && (
                 <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
                   {draftState.players.map(player => {
@@ -999,11 +1037,39 @@
                                 const card = draftState.availablePool.find(c => c.uniqueId === cardId);
                                 if (!card) return null;
                                 return (
-                                  <div key={cardId} className="flex items-center justify-between bg-slate-900 p-2 rounded border border-amber-900/30 text-xs">
-                                    <span className="text-amber-200 truncate font-medium">{index + 1}. {card.name}</span>
-                                    <button onClick={() => toggleQueue(cardId)} className="text-rose-400 hover:text-rose-300 font-bold ml-2">
-                                      ×
-                                    </button>
+                                  <div key={cardId} className="flex items-center justify-between bg-slate-900 p-2 rounded border border-amber-900/30 text-xs gap-2">
+                                    <div className="flex items-center gap-1.5 truncate">
+                                      <span className="text-amber-500 font-bold font-mono w-4">{index + 1}.</span>
+                                      <span className="text-amber-200 truncate font-medium">{card.name}</span>
+                                    </div>
+                                    <div className="flex items-center gap-1 shrink-0">
+                                      {/* Move Priority Up */}
+                                      <button 
+                                        onClick={() => moveQueuePriority(index, "UP")}
+                                        disabled={index === 0}
+                                        className="w-5 h-5 flex items-center justify-center bg-amber-950 border border-amber-700 text-amber-300 rounded hover:bg-amber-800 disabled:opacity-20 text-[10px]"
+                                        title="Move Higher Priority"
+                                      >
+                                        ▲
+                                      </button>
+                                      {/* Move Priority Down */}
+                                      <button 
+                                        onClick={() => moveQueuePriority(index, "DOWN")}
+                                        disabled={index === player.queue.length - 1}
+                                        className="w-5 h-5 flex items-center justify-center bg-amber-950 border border-amber-700 text-amber-300 rounded hover:bg-amber-800 disabled:opacity-20 text-[10px]"
+                                        title="Move Lower Priority"
+                                      >
+                                        ▼
+                                      </button>
+                                      {/* Remove from Queue */}
+                                      <button 
+                                        onClick={() => toggleQueue(cardId)} 
+                                        className="text-rose-400 hover:text-rose-300 font-bold ml-1 text-sm"
+                                        title="Remove Card"
+                                      >
+                                        ×
+                                      </button>
+                                    </div>
                                   </div>
                                 );
                               })
