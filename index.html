@@ -77,15 +77,14 @@
     import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
     // PASTE YOUR FIREBASE CONFIG HERE
-   const firebaseConfig = {
-  apiKey: "AIzaSyDcBbijNZxkEEbvRaf6fUXrGd8yIagDqLM",
-  authDomain: "draft-6cadc.firebaseapp.com",
-  projectId: "draft-6cadc",
-  storageBucket: "draft-6cadc.firebasestorage.app",
-  messagingSenderId: "185016725869",
-  appId: "1:185016725869:web:db7402ddcfa8e9d3abaa64",
-  measurementId: "G-NZMZTSHD8D"
-};
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_PROJECT_ID.appspot.com",
+      messagingSenderId: "YOUR_SENDER_ID",
+      appId: "YOUR_APP_ID"
+    };
 
     const app = initializeApp(firebaseConfig);
     window.db = getFirestore(app);
@@ -299,7 +298,6 @@
 
       try {
         if (draftState.discordMessageId) {
-          // EDIT EXISTING MESSAGE IN PLACE (PATCH)
           const patchUrl = `${webhookUrl}/messages/${draftState.discordMessageId}`;
           const res = await fetch(patchUrl, {
             method: "PATCH",
@@ -309,7 +307,6 @@
           if (res.ok) return draftState.discordMessageId;
         }
 
-        // CREATE NEW INITIAL MESSAGE AND RETRIEVE ID (?wait=true)
         const postUrl = `${webhookUrl}?wait=true`;
         const res = await fetch(postUrl, {
           method: "POST",
@@ -344,6 +341,9 @@
       const [copiedLink, setCopiedLink] = useState(false);
       const [showLogDrawer, setShowLogDrawer] = useState(false);
       const [activeMobilePopoverCardId, setActiveMobilePopoverCardId] = useState(null);
+      
+      // PICK CONFIRMATION MODAL STATE
+      const [pendingPickCard, setPendingPickCard] = useState(null);
 
       const [searchTerm, setSearchTerm] = useState("");
       const [colorFilter, setColorFilter] = useState("ALL");
@@ -361,6 +361,17 @@
         const hash = window.location.hash.replace("#", "").trim();
         if (hash.length > 0 && window.db) {
           setRoomId(hash);
+
+          // Check LocalStorage for previously saved seat for this room ID
+          const savedSeat = localStorage.getItem(`shandalar_seat_${hash}`);
+          if (savedSeat !== null) {
+            const seatNum = parseInt(savedSeat, 10);
+            if (!isNaN(seatNum)) {
+              setMySeat(seatNum);
+              setHasChosenSeat(true);
+            }
+          }
+
           const { doc, onSnapshot } = window.firestoreTools;
           const unsub = onSnapshot(doc(window.db, "drafts", hash), (docSnap) => {
             if (docSnap.exists()) {
@@ -372,12 +383,20 @@
         }
       }, [window.db, window.location.hash]);
 
+      // Save seat selection to localStorage whenever seat is assigned
+      const chooseSeat = (seatIndex) => {
+        setMySeat(seatIndex);
+        setHasChosenSeat(true);
+        if (roomId && seatIndex !== null) {
+          localStorage.setItem(`shandalar_seat_${roomId}`, seatIndex.toString());
+        }
+      };
+
       // Trigger automatic turn execution & Single Message Discord In-Place Update
       useEffect(() => {
         if (!draftState) return;
 
         const processWebhookAndAutoDraft = async () => {
-          // Trigger Discord In-Place Update if pick changed
           if (draftState.discordWebhook && draftState.lastNotifiedPick !== draftState.currentPickIndex) {
             const messageId = await sendOrUpdateDiscordTurnNotification(draftState.discordWebhook, draftState, draftState.pickLog);
             if (messageId) {
@@ -394,7 +413,6 @@
           const activeSeat = draftState.pickSequence[draftState.currentPickIndex];
           const activePlayer = draftState.players[activeSeat];
 
-          // Auto-Draft Trigger
           if (activePlayer && activePlayer.autoDraft && activePlayer.queue.length > 0) {
             const topQueuedId = activePlayer.queue.find(id => 
               draftState.availablePool.some(c => c.uniqueId === id)
@@ -536,6 +554,7 @@
         };
 
         setDraftState(nextState);
+        setPendingPickCard(null);
         syncStateToFirestore(nextState);
       };
 
@@ -647,10 +666,7 @@
                   {draftState.players.map((p, idx) => (
                     <button
                       key={p.id}
-                      onClick={() => {
-                        setMySeat(idx);
-                        setHasChosenSeat(true);
-                      }}
+                      onClick={() => chooseSeat(idx)}
                       className="p-3.5 rounded-xl bg-amber-950/90 border border-amber-700/80 hover:border-amber-400 text-amber-100 font-bold text-sm flex items-center justify-between transition hover:-translate-y-0.5 shadow"
                     >
                       <span className="truncate">{p.name}</span>
@@ -660,14 +676,48 @@
                 </div>
 
                 <button
-                  onClick={() => {
-                    setMySeat(null);
-                    setHasChosenSeat(true);
-                  }}
+                  onClick={() => chooseSeat(null)}
                   className="w-full py-3 bg-amber-900 hover:bg-amber-800 text-amber-100 font-bold text-sm rounded-xl border border-amber-700 transition"
                 >
                   Enter as Spectator (Observer Mode)
                 </button>
+              </div>
+            </div>
+          )}
+
+          {/* PICK CONFIRMATION MODAL */}
+          {pendingPickCard && (
+            <div className="fixed inset-0 bg-slate-950/90 z-50 flex items-center justify-center p-4 backdrop-blur-md">
+              <div className="bg-parchment rounded-2xl p-6 max-w-sm w-full text-center relative shadow-2xl border-2 border-amber-800 gold-border">
+                <h3 className="text-lg font-black font-shandalar text-amber-950 mb-1">
+                  Confirm Draft Pick
+                </h3>
+                <p className="text-xs font-parchment text-amber-900/80 mb-4">
+                  Are you sure you want to draft this card for Pick #{draftState.currentPickIndex + 1}?
+                </p>
+
+                <div className="w-44 mx-auto mb-4 border-2 border-amber-800 rounded-xl overflow-hidden shadow-xl">
+                  <img src={pendingPickCard.image} alt={pendingPickCard.name} className="w-full h-auto" />
+                </div>
+
+                <div className="text-sm font-bold text-amber-950 mb-4 font-shandalar">
+                  {pendingPickCard.name}
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => setPendingPickCard(null)}
+                    className="py-2.5 bg-slate-900 hover:bg-slate-800 text-amber-200 font-bold text-xs rounded-xl border border-amber-900 transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => executePick(pendingPickCard, mySeat)}
+                    className="py-2.5 bg-amber-600 hover:bg-amber-500 text-slate-950 font-black font-shandalar text-xs rounded-xl shadow-lg transition"
+                  >
+                    Yes, Draft Card!
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -1005,7 +1055,7 @@
 
                               {isMyTurn && (
                                 <button
-                                  onClick={() => executePick(card, mySeat)}
+                                  onClick={() => setPendingPickCard(card)}
                                   className="w-full py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm rounded-xl font-shandalar shadow-md"
                                 >
                                   Draft Card
@@ -1060,7 +1110,7 @@
 
                               {isMyTurn && (
                                 <button
-                                  onClick={() => executePick(card, mySeat)}
+                                  onClick={() => setPendingPickCard(card)}
                                   className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-lg font-shandalar shadow"
                                 >
                                   Draft
@@ -1081,7 +1131,7 @@
                               )}
                             </div>
 
-                            {/* SCRYFALL CARD PREVIEW POPOVER (HOVER ON PC, CLICK ON MOBILE) */}
+                            {/* SCRYFALL CARD PREVIEW POPOVER */}
                             <div 
                               className={`z-30 pointer-events-none transition-all duration-200 ${
                                 isMobileOpen 
